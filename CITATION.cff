@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Map of Open Source Science (MOSS)"
+version: "v1.0.0"
+authors:
+  - family-names: "Bervar"
+    given-names: "Devesh"
+    orcid: "https://orcid.org/0009-0002-4110-0246"
+    affiliation: "IIT Madras"
+date-released: "2025-01-15"
+repository-code: "https://github.com/numfocus/moss"
+url: "https://github.com/numfocus/moss"
+abstract: "The Map of Open Source Science (MOSS) visualizes the intersection of open source and scientific research."
