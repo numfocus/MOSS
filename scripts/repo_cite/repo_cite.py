@@ -1,3 +1,18 @@
+#!/usr/bin/env python3
+"""
+Repo Cite Script
+
+This script collects metadata and citation information from a GitHub repository and related scholarly works.
+It retrieves repository details from GitHub and then uses the OpenAlex API to fetch paper details,
+authors, citations, and related metadata. The output (in JSON format) can be used, for example,
+to generate a network graph of papers, people, institutions, topics, and projects.
+
+Note:
+    - Currently, the DOI extraction is tailored to GitHub by looking for a 'CITATION.cff' file
+      (or, as a fallback, scanning the README). Future versions may generalize to other hosting platforms.
+    - RECORD_LIMIT and MAX_DEPTH are now read as integers (with 0 meaning “all”) to keep their type consistent.
+"""
+
 import requests
 import json
 import re
@@ -8,13 +23,14 @@ from collections import deque
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import os
+from typing import Optional, Dict, Any
 
 # Configure logging
 logging.basicConfig(
     level=logging.DEBUG,  # Set to DEBUG for more detailed output
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('script.log'),  # Log to a file
+        logging.FileHandler('repo_cite.log'),  # More descriptive log file name
         logging.StreamHandler()             # Also log to console
     ]
 )
@@ -22,37 +38,59 @@ logging.basicConfig(
 # Load environment variables from .env file
 load_dotenv()
 
-# Global dictionaries to store unique entities
-papers_dict = {}
-authors_dict = {}
-institutions_dict = {}
-topics_dict = {}
-projects_list = []
+# Global dictionaries to store unique entities (capitalized to denote globals)
+PAPERS_DICT: Dict[str, Any] = {}
+AUTHORS_DICT: Dict[str, Any] = {}
+INSTITUTIONS_DICT: Dict[str, Any] = {}
+TOPICS_DICT: Dict[str, Any] = {}
+PROJECTS_LIST: list = []
 
 # Visited papers set to prevent duplicates
-visited_papers = set()
+VISITED_PAPERS: set = set()
 
-# Set your email for OpenAlex API rate limit increase
-YOUR_EMAIL = 'your.email@example.com'  # Replace with your actual email
+# Set your email for OpenAlex API rate limit increase, sourced from the .env file if available
+OPENALEX_EMAIL: str = os.getenv('OPENALEX_EMAIL', 'your.email@example.com')  # Replace in your .env file
 
 # GitHub personal access token (read from .env file)
-GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')  # Ensure your .env file has GITHUB_TOKEN=<your_token>
+GITHUB_TOKEN: Optional[str] = os.getenv('GITHUB_TOKEN')  # Ensure your .env file has GITHUB_TOKEN=<your_token>
 
-# Set the number of records to retrieve per API call
-RECORD_LIMIT = 'all'  # Change to an integer for testing purposes
+# Set the number of records to retrieve per API call (0 means all)
+try:
+    RECORD_LIMIT: int = int(os.getenv('RECORD_LIMIT', '0'))
+except ValueError:
+    RECORD_LIMIT = 0  # default to 0 (all records)
 
-# Maximum depth for citation traversal
-MAX_DEPTH = 2  # User can set desired depth
+# Maximum depth for citation traversal, sourced from .env if available
+try:
+    MAX_DEPTH: int = int(os.getenv('MAX_DEPTH', '2'))
+except ValueError:
+    MAX_DEPTH = 2
 
 # Maximum number of retries for API calls
-MAX_RETRIES = 3
+MAX_RETRIES: int = 3
 
 # Delay between retries (in seconds)
-RETRY_DELAY = 5
+RETRY_DELAY: int = 5
 
-def get_doi_from_github_repo(repo_owner, repo_name):
+def get_doi_from_github_repo(repo_owner: str, repo_name: str) -> Optional[str]:
     """
     Fetch the DOI from a GitHub repository.
+
+    Parameters:
+        repo_owner (str): GitHub username or organization name (e.g., "jring-o").
+        repo_name (str): Repository name (e.g., "repo_cite").
+
+    Returns:
+        Optional[str]: The DOI if found; otherwise, None.
+
+    This function searches for a 'CITATION.cff' file in the repository first.
+    If not found, it then searches the 'README.md' for DOI patterns.
+    
+    TODO:
+        - Extend this function to search for a '.zenodo.json' file, which may also contain metadata.
+    
+    Note:
+        Scanning 'README.md' may sometimes capture DOIs unrelated to the software’s own citation.
     """
     logging.info(f"Fetching DOI from GitHub repository '{repo_owner}/{repo_name}'")
     url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents"
@@ -65,52 +103,58 @@ def get_doi_from_github_repo(repo_owner, repo_name):
         return None
     contents = response.json()
     # Search for CITATION.cff
-    doi = None
     for item in contents:
         if item['name'].lower() == 'citation.cff':
             logging.info("Found 'CITATION.cff' in repository")
             # Fetch the content of CITATION.cff
-            citation_url = item['download_url']
-            citation_response = requests.get(citation_url, headers=headers)
-            if citation_response.status_code == 200:
-                citation_content = citation_response.text
-                # Parse the CITATION.cff content to get the DOI
-                for line in citation_content.splitlines():
-                    if 'doi:' in line.lower():
-                        doi = line.split(':', 1)[1].strip()
-                        doi = doi.strip('"')
-                        logging.info(f"DOI found in 'CITATION.cff': {doi}")
-                        return doi
+            citation_url = item.get('download_url')
+            if citation_url:
+                citation_response = requests.get(citation_url, headers=headers)
+                if citation_response.status_code == 200:
+                    citation_content = citation_response.text
+                    # Parse the CITATION.cff content to get the DOI
+                    for line in citation_content.splitlines():
+                        if 'doi:' in line.lower():
+                            doi = line.split(':', 1)[1].strip().strip('"')
+                            logging.info(f"DOI found in 'CITATION.cff': {doi}")
+                            return doi
+                else:
+                    # Not treating inability to fetch CITATION.cff as an error
+                    logging.info("Unable to fetch 'CITATION.cff' content; continuing search in README.md")
             else:
-                logging.error("Error fetching 'CITATION.cff'")
-                return None
+                logging.info("'CITATION.cff' does not have a download URL; continuing search")
     # If CITATION.cff not found or DOI not found, try README.md
     for item in contents:
         if item['name'].lower() == 'readme.md':
             logging.info("Searching for DOI in 'README.md'")
-            readme_url = item['download_url']
-            readme_response = requests.get(readme_url, headers=headers)
-            if readme_response.status_code == 200:
-                readme_content = readme_response.text
-                # Search for DOI in README
-                doi_matches = re.findall(r'(10\.\d{4,9}/[-._;()/:A-Z0-9]+)', readme_content, re.IGNORECASE)
-                if doi_matches:
-                    doi = doi_matches[0]
-                    logging.info(f"DOI found in 'README.md': {doi}")
-                    return doi
-            else:
-                logging.error("Error fetching 'README.md'")
-                return None
+            readme_url = item.get('download_url')
+            if readme_url:
+                readme_response = requests.get(readme_url, headers=headers)
+                if readme_response.status_code == 200:
+                    readme_content = readme_response.text
+                    doi_matches = re.findall(r'(10\.\d{4,9}/[-._;()/:A-Z0-9]+)', readme_content, re.IGNORECASE)
+                    if doi_matches:
+                        doi = doi_matches[0]
+                        logging.info(f"DOI found in 'README.md': {doi}")
+                        return doi
+                else:
+                    logging.error("Error fetching 'README.md'")
+                    return None
     logging.warning("DOI not found in the repository")
-    return None
+    # Implicitly returns None
 
-def get_paper_details(doi):
+def get_paper_details(doi: str) -> Optional[dict]:
     """
-    Fetch paper details from OpenAlex using DOI.
+    Fetch paper details from OpenAlex using the DOI.
+
+    Parameters:
+        doi (str): Digital Object Identifier of the paper.
+
+    Returns:
+        Optional[dict]: Paper data as a dictionary if retrieval is successful; otherwise, None.
     """
     logging.info(f"Fetching paper details for DOI: {doi}")
-    encoded_doi = quote(doi)
-    url = f"https://api.openalex.org/works/doi:{encoded_doi}?mailto={YOUR_EMAIL}"
+    url = f"https://api.openalex.org/works/doi:{quote(doi)}?mailto={OPENALEX_EMAIL}"
     response = make_api_request(url)
     if response is None:
         return None
@@ -118,20 +162,27 @@ def get_paper_details(doi):
     logging.debug(f"Paper data retrieved: {paper_data}")
     return paper_data
 
-def make_api_request(url, headers=None):
+def make_api_request(url: str, headers: Optional[dict] = None, params: Optional[dict] = None) -> Optional[requests.Response]:
     """
     Make an API request with retry logic and exponential backoff.
+
+    Parameters:
+        url (str): The API endpoint.
+        headers (Optional[dict]): HTTP headers to include in the request.
+        params (Optional[dict]): Query parameters for the GET request.
+
+    Returns:
+        Optional[requests.Response]: The HTTP response if successful; otherwise, None.
     """
     if headers is None:
         headers = {}
     retries = 0
     while retries < MAX_RETRIES:
         try:
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers, params=params)
             if response.status_code == 200:
                 return response
             elif response.status_code in [429, 500, 502, 503, 504]:
-                # Retry on rate limit or server errors
                 retries += 1
                 sleep_time = RETRY_DELAY * (2 ** (retries - 1))
                 logging.warning(f"API request failed with status {response.status_code}. Retrying in {sleep_time} seconds...")
@@ -147,9 +198,18 @@ def make_api_request(url, headers=None):
     logging.error(f"Failed to retrieve data after {MAX_RETRIES} attempts.")
     return None
 
-def process_paper_data(paper_data):
+def process_paper_data(paper_data: dict) -> None:
+    """
+    Process and store paper data from OpenAlex.
+
+    Parameters:
+        paper_data (dict): The paper data dictionary obtained from OpenAlex.
+
+    Side Effects:
+        Updates the global PAPERS_DICT, AUTHORS_DICT, INSTITUTIONS_DICT, and TOPICS_DICT.
+    """
     openalex_id = paper_data.get('id')
-    if openalex_id in papers_dict:
+    if openalex_id in PAPERS_DICT:
         logging.debug(f"Paper {openalex_id} already processed")
         return
     logging.info(f"Processing paper {openalex_id}")
@@ -168,21 +228,23 @@ def process_paper_data(paper_data):
         abstract_text = ' '.join(abstract_words)
     else:
         abstract_text = None
+        # TODO: Consider fetching open access objects for a more detailed abstract if available.
 
     # Get topics (concepts)
     concepts = paper_data.get('concepts', [])
     topics = []
     for concept in concepts:
-        topic_id = concept['id']
-        if topic_id not in topics_dict:
+        topic_id = concept.get('id')
+        if topic_id and topic_id not in TOPICS_DICT:
             logging.info(f"Adding topic {topic_id}")
             topic_node = {
                 'id': topic_id,
-                'name': concept['display_name'],
+                'name': concept.get('display_name'),
                 'type': 'topic'
             }
-            topics_dict[topic_id] = topic_node
-        topics.append(topic_id)
+            TOPICS_DICT[topic_id] = topic_node
+        if topic_id:
+            topics.append(topic_id)
 
     # Process authors
     authors = []
@@ -190,7 +252,7 @@ def process_paper_data(paper_data):
     for author_entry in authors_data:
         author_data = author_entry.get('author', {})
         author_id = author_data.get('id')
-        if author_id not in authors_dict:
+        if author_id and author_id not in AUTHORS_DICT:
             logging.info(f"Adding author {author_id}")
             author_node = {
                 'id': author_id,
@@ -204,19 +266,21 @@ def process_paper_data(paper_data):
             affiliations_data = author_entry.get('institutions', [])
             for inst_data in affiliations_data:
                 inst_id = inst_data.get('id')
-                if inst_id not in institutions_dict:
+                if inst_id and inst_id not in INSTITUTIONS_DICT:
                     logging.info(f"Adding institution {inst_id}")
                     institution_node = {
                         'id': inst_id,
                         'name': inst_data.get('display_name'),
                         'type': 'institution'
                     }
-                    institutions_dict[inst_id] = institution_node
-                author_node['affiliations'].append(inst_id)
-            authors_dict[author_id] = author_node
-        authors.append(author_id)
-        if openalex_id not in authors_dict[author_id]['papers_authored']:
-            authors_dict[author_id]['papers_authored'].append(openalex_id)
+                    INSTITUTIONS_DICT[inst_id] = institution_node
+                if inst_id:
+                    author_node['affiliations'].append(inst_id)
+            AUTHORS_DICT[author_id] = author_node
+        if author_id:
+            authors.append(author_id)
+            if openalex_id not in AUTHORS_DICT[author_id]['papers_authored']:
+                AUTHORS_DICT[author_id]['papers_authored'].append(openalex_id)
 
     # Create paper node
     paper_node = {
@@ -236,13 +300,17 @@ def process_paper_data(paper_data):
     references = paper_data.get('referenced_works', [])
     for ref_id in references:
         paper_node['references'].append(ref_id)
+        # TODO: Consider retaining additional metadata from referenced_works if needed.
 
-    papers_dict[openalex_id] = paper_node
+    PAPERS_DICT[openalex_id] = paper_node
     logging.debug(f"Paper node created: {paper_node}")
 
-def get_papers_by_author(author_id):
+def get_papers_by_author(author_id: str) -> None:
     """
-    Fetch papers by the author from OpenAlex.
+    Fetch papers authored by a given author from OpenAlex.
+
+    Parameters:
+        author_id (str): The OpenAlex identifier for the author.
     """
     logging.info(f"Fetching papers authored by {author_id}")
     page = 1
@@ -250,8 +318,14 @@ def get_papers_by_author(author_id):
     records_retrieved = 0
 
     while True:
-        url = f"https://api.openalex.org/works?filter=authorships.author.id:{author_id}&page={page}&per-page={per_page}&mailto={YOUR_EMAIL}"
-        response = make_api_request(url)
+        params = {
+            "filter": f"authorships.author.id:{author_id}",
+            "page": page,
+            "per-page": per_page,
+            "mailto": OPENALEX_EMAIL
+        }
+        url = "https://api.openalex.org/works"
+        response = make_api_request(url, params=params)
         if response is None:
             break
         data = response.json()
@@ -262,20 +336,22 @@ def get_papers_by_author(author_id):
         for work in works:
             process_paper_data(work)
             records_retrieved += 1
-            if RECORD_LIMIT != 'all' and records_retrieved >= RECORD_LIMIT:
+            if RECORD_LIMIT != 0 and records_retrieved >= RECORD_LIMIT:
                 logging.info(f"Reached record limit ({RECORD_LIMIT}) for author {author_id}")
                 return
-        if data['meta'].get('next_page', None) and (RECORD_LIMIT == 'all' or records_retrieved < RECORD_LIMIT):
+        if data.get('meta', {}).get('next_page') and (RECORD_LIMIT == 0 or records_retrieved < RECORD_LIMIT):
             page += 1
             logging.debug(f"Moving to page {page} for author {author_id}")
-            # Respect rate limits
-            time.sleep(1)
+            time.sleep(1)  # Respect rate limits
         else:
             break
 
-def iterative_citation_gathering(start_paper_id):
+def iterative_citation_gathering(start_paper_id: str) -> None:
     """
-    Perform iterative citation gathering using a queue up to MAX_DEPTH.
+    Perform iterative citation gathering up to MAX_DEPTH starting from a given paper.
+
+    Parameters:
+        start_paper_id (str): The OpenAlex identifier for the starting paper.
     """
     logging.info(f"Starting iterative citation gathering from paper {start_paper_id}")
     queue = deque()
@@ -285,23 +361,23 @@ def iterative_citation_gathering(start_paper_id):
             current_paper_id, current_depth = queue.popleft()
             if current_depth > MAX_DEPTH:
                 continue
-            if current_paper_id in visited_papers:
+            if current_paper_id in VISITED_PAPERS:
                 continue
-            visited_papers.add(current_paper_id)
+            VISITED_PAPERS.add(current_paper_id)
             logging.info(f"Processing paper {current_paper_id} at depth {current_depth}")
             # Fetch and process the paper details if not already done
-            if current_paper_id not in papers_dict:
-                # Fetch paper details
-                url = f"https://api.openalex.org/works/{current_paper_id}?mailto={YOUR_EMAIL}"
-                response = make_api_request(url)
+            if current_paper_id not in PAPERS_DICT:
+                url = f"https://api.openalex.org/works/{current_paper_id}"
+                params = {"mailto": OPENALEX_EMAIL}
+                response = make_api_request(url, params=params)
                 if response is None:
                     continue
                 paper_data = response.json()
                 process_paper_data(paper_data)
             else:
-                paper_data = papers_dict[current_paper_id]
-            # Get authors of the current paper and their papers
-            authors = papers_dict[current_paper_id]['authors']
+                paper_data = PAPERS_DICT[current_paper_id]
+            # Get authors of the current paper and fetch their papers
+            authors = paper_data.get('authors', [])
             for author_id in authors:
                 get_papers_by_author(author_id)
             # Get citing papers
@@ -309,8 +385,14 @@ def iterative_citation_gathering(start_paper_id):
             per_page = 200
             records_retrieved = 0
             while True:
-                url = f"https://api.openalex.org/works?filter=cites:{current_paper_id}&page={page}&per-page={per_page}&mailto={YOUR_EMAIL}"
-                response = make_api_request(url)
+                params = {
+                    "filter": f"cites:{current_paper_id}",
+                    "page": page,
+                    "per-page": per_page,
+                    "mailto": OPENALEX_EMAIL
+                }
+                url = "https://api.openalex.org/works"
+                response = make_api_request(url, params=params)
                 if response is None:
                     break
                 data = response.json()
@@ -320,19 +402,19 @@ def iterative_citation_gathering(start_paper_id):
                     break
                 for work in works:
                     citing_paper_id = work.get('id')
-                    if citing_paper_id in visited_papers:
+                    if citing_paper_id in VISITED_PAPERS:
                         continue
                     process_paper_data(work)
                     # Update cited_by attribute
-                    if current_paper_id in papers_dict:
-                        if citing_paper_id not in papers_dict[current_paper_id]['cited_by']:
-                            papers_dict[current_paper_id]['cited_by'].append(citing_paper_id)
+                    if current_paper_id in PAPERS_DICT:
+                        if citing_paper_id not in PAPERS_DICT[current_paper_id]['cited_by']:
+                            PAPERS_DICT[current_paper_id]['cited_by'].append(citing_paper_id)
                     records_retrieved += 1
                     queue.append((citing_paper_id, current_depth + 1))
-                    if RECORD_LIMIT != 'all' and records_retrieved >= RECORD_LIMIT:
+                    if RECORD_LIMIT != 0 and records_retrieved >= RECORD_LIMIT:
                         logging.info(f"Reached record limit ({RECORD_LIMIT}) for citing papers of {current_paper_id}")
                         break
-                if data['meta'].get('next_page', None) and (RECORD_LIMIT == 'all' or records_retrieved < RECORD_LIMIT):
+                if data.get('meta', {}).get('next_page') and (RECORD_LIMIT == 0 or records_retrieved < RECORD_LIMIT):
                     page += 1
                     logging.debug(f"Moving to page {page} for citing papers of {current_paper_id}")
                     time.sleep(1)
@@ -342,18 +424,26 @@ def iterative_citation_gathering(start_paper_id):
             logging.warning("Process interrupted by user. Saving collected data.")
             break
 
-def collect_github_data(repo_owner, repo_name):
+def collect_github_data(repo_owner: str, repo_name: str) -> Optional[dict]:
     """
-    Collect data from the GitHub repository.
+    Collect data from the GitHub repository, including repository details, contributors,
+    issues, pull requests, languages, releases, and recent activity.
+
+    Parameters:
+        repo_owner (str): GitHub username or organization name.
+        repo_name (str): Repository name.
+
+    Returns:
+        Optional[dict]: A dictionary containing the repository data if successful; otherwise, None.
     """
     logging.info(f"Collecting data for GitHub repository '{repo_owner}/{repo_name}'")
     headers = {}
     if GITHUB_TOKEN:
         headers['Authorization'] = f'token {GITHUB_TOKEN}'
     base_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}"
-    repo_data = {}
+    repo_data: dict = {}
     # Get repository details
-    response = make_api_request(base_url, headers)
+    response = make_api_request(base_url, headers=headers)
     if response is None:
         logging.error("Failed to fetch repository data.")
         return None
@@ -379,26 +469,31 @@ def collect_github_data(repo_owner, repo_name):
     }
     # Check for README and other files
     contents_url = f"{base_url}/contents"
-    response = make_api_request(contents_url, headers)
+    response = make_api_request(contents_url, headers=headers)
     if response is None:
         logging.error("Failed to fetch repository contents.")
         return None
     contents = response.json()
     for item in contents:
-        name = item['name']
-        if name.lower() == 'readme.md':
+        name = item.get('name', '').lower()
+        if name == 'readme.md':
             repo_data['has_readme'] = True
-        elif name.lower() == 'code_of_conduct.md':
+        elif name == 'code_of_conduct.md':
             repo_data['has_code_of_conduct'] = True
-        elif name.lower() in [key.lower() for key in repo_data['documentation_files'].keys()]:
-            repo_data['documentation_files'][name] = True
+        elif name in [key.lower() for key in repo_data['documentation_files'].keys()]:
+            # Match the original key casing
+            for key in repo_data['documentation_files']:
+                if key.lower() == name:
+                    repo_data['documentation_files'][key] = True
+                    break
     # Get contributors
-    contributors_url = f"{base_url}/contributors?per_page=100"
+    contributors_url = f"{base_url}/contributors"
     contributors_set = set()
     page = 1
     while True:
-        response = make_api_request(f"{contributors_url}&page={page}", headers)
-        if response is None or response.status_code != 200:
+        params = {"per_page": 100, "page": page}
+        response = make_api_request(contributors_url, headers=headers, params=params)
+        if response is None:
             break
         page_contributors = response.json()
         if not page_contributors:
@@ -407,7 +502,6 @@ def collect_github_data(repo_owner, repo_name):
             login = contributor.get('login')
             if login:
                 contributors_set.add(login)
-        # Check if there are more pages
         if 'next' in response.links:
             page += 1
             logging.debug(f"Fetching page {page} of contributors")
@@ -416,12 +510,13 @@ def collect_github_data(repo_owner, repo_name):
     repo_data['num_contributors'] = len(contributors_set)
     logging.info(f"Total contributors: {repo_data['num_contributors']}")
     # Get issues
-    issues_url = f"{base_url}/issues?state=all&per_page=100"
+    issues_url = f"{base_url}/issues"
     issues = []
     page = 1
     while True:
-        response = make_api_request(f"{issues_url}&page={page}", headers)
-        if response is None or response.status_code != 200:
+        params = {"state": "all", "per_page": 100, "page": page}
+        response = make_api_request(issues_url, headers=headers, params=params)
+        if response is None:
             break
         page_issues = response.json()
         if not page_issues:
@@ -439,37 +534,36 @@ def collect_github_data(repo_owner, repo_name):
     num_closed_issues_with_close_time = 0
     num_issues_with_first_response = 0
     for issue in closed_issues:
-        created_at = datetime.strptime(issue['created_at'], "%Y-%m-%dT%H:%M:%SZ")
-        closed_at = datetime.strptime(issue['closed_at'], "%Y-%m-%dT%H:%M:%SZ")
-        close_time = (closed_at - created_at).total_seconds() / 3600  # in hours
-        total_close_time += close_time
-        num_closed_issues_with_close_time += 1
-        # First response time
-        comments_url = issue['comments_url']
-        comments_response = make_api_request(comments_url, headers)
-        if comments_response and comments_response.status_code == 200:
-            comments = comments_response.json()
-            if comments:
-                first_comment = comments[0]
-                first_response_at = datetime.strptime(first_comment['created_at'], "%Y-%m-%dT%H:%M:%SZ")
-                first_response_time = (first_response_at - created_at).total_seconds() / 3600  # in hours
-                total_first_response_time += first_response_time
-                num_issues_with_first_response += 1
-    if num_closed_issues_with_close_time > 0:
-        repo_data['avg_time_to_close_issues'] = total_close_time / num_closed_issues_with_close_time
-    else:
-        repo_data['avg_time_to_close_issues'] = None
-    if num_issues_with_first_response > 0:
-        repo_data['avg_time_to_first_response_issue'] = total_first_response_time / num_issues_with_first_response
-    else:
-        repo_data['avg_time_to_first_response_issue'] = None
+        try:
+            created_at = datetime.strptime(issue['created_at'], "%Y-%m-%dT%H:%M:%SZ")
+            closed_at = datetime.strptime(issue['closed_at'], "%Y-%m-%dT%H:%M:%SZ")
+            close_time = (closed_at - created_at).total_seconds() / 3600  # in hours
+            total_close_time += close_time
+            num_closed_issues_with_close_time += 1
+            # First response time
+            comments_url = issue.get('comments_url')
+            if comments_url:
+                comments_response = make_api_request(comments_url, headers=headers)
+                if comments_response and comments_response.status_code == 200:
+                    comments = comments_response.json()
+                    if comments:
+                        first_comment = comments[0]
+                        first_response_at = datetime.strptime(first_comment['created_at'], "%Y-%m-%dT%H:%M:%SZ")
+                        first_response_time = (first_response_at - created_at).total_seconds() / 3600  # in hours
+                        total_first_response_time += first_response_time
+                        num_issues_with_first_response += 1
+        except Exception as e:
+            logging.error(f"Error processing issue dates: {e}")
+    repo_data['avg_time_to_close_issues'] = (total_close_time / num_closed_issues_with_close_time) if num_closed_issues_with_close_time > 0 else None
+    repo_data['avg_time_to_first_response_issue'] = (total_first_response_time / num_issues_with_first_response) if num_issues_with_first_response > 0 else None
     # Get pull requests
-    pulls_url = f"{base_url}/pulls?state=all&per_page=100"
+    pulls_url = f"{base_url}/pulls"
     pulls = []
     page = 1
     while True:
-        response = make_api_request(f"{pulls_url}&page={page}", headers)
-        if response is None or response.status_code != 200:
+        params = {"state": "all", "per_page": 100, "page": page}
+        response = make_api_request(pulls_url, headers=headers, params=params)
+        if response is None:
             break
         page_pulls = response.json()
         if not page_pulls:
@@ -484,45 +578,44 @@ def collect_github_data(repo_owner, repo_name):
     num_merged_pulls_with_time = 0
     num_pulls_with_first_review = 0
     for pr in closed_pulls:
-        pr_details_response = make_api_request(pr['url'], headers)
+        pr_details_response = make_api_request(pr.get('url'), headers=headers)
         if pr_details_response and pr_details_response.status_code == 200:
             pr_details = pr_details_response.json()
             if pr_details.get('merged_at'):
                 merged_pulls.append(pr)
-                created_at = datetime.strptime(pr_details['created_at'], "%Y-%m-%dT%H:%M:%SZ")
-                merged_at = datetime.strptime(pr_details['merged_at'], "%Y-%m-%dT%H:%M:%SZ")
-                merge_time = (merged_at - created_at).total_seconds() / 3600  # in hours
-                total_merge_time += merge_time
-                num_merged_pulls_with_time += 1
-                # First review time
-                reviews_url = pr_details['url'] + '/reviews'
-                reviews_response = make_api_request(reviews_url, headers)
-                if reviews_response and reviews_response.status_code == 200:
-                    reviews = reviews_response.json()
-                    if reviews:
-                        first_review = reviews[0]
-                        review_submitted_at = datetime.strptime(first_review['submitted_at'], "%Y-%m-%dT%H:%M:%SZ")
-                        first_review_time = (review_submitted_at - created_at).total_seconds() / 3600  # in hours
-                        total_first_review_time += first_review_time
-                        num_pulls_with_first_review += 1
+                try:
+                    created_at = datetime.strptime(pr_details['created_at'], "%Y-%m-%dT%H:%M:%SZ")
+                    merged_at = datetime.strptime(pr_details['merged_at'], "%Y-%m-%dT%H:%M:%SZ")
+                    merge_time = (merged_at - created_at).total_seconds() / 3600  # in hours
+                    total_merge_time += merge_time
+                    num_merged_pulls_with_time += 1
+                    # First review time
+                    reviews_url = pr_details['url'] + '/reviews'
+                    reviews_response = make_api_request(reviews_url, headers=headers)
+                    if reviews_response and reviews_response.status_code == 200:
+                        reviews = reviews_response.json()
+                        if reviews:
+                            first_review = reviews[0]
+                            review_submitted_at = datetime.strptime(first_review['submitted_at'], "%Y-%m-%dT%H:%M:%SZ")
+                            first_review_time = (review_submitted_at - created_at).total_seconds() / 3600  # in hours
+                            total_first_review_time += first_review_time
+                            num_pulls_with_first_review += 1
+                except Exception as e:
+                    logging.error(f"Error processing pull request dates: {e}")
     repo_data['total_pull_requests'] = len(pulls)
     repo_data['open_pull_requests'] = len(open_pulls)
     repo_data['closed_pull_requests'] = len(closed_pulls)
     repo_data['merged_pull_requests'] = len(merged_pulls)
-    if num_merged_pulls_with_time > 0:
-        repo_data['avg_time_to_merge_pr'] = total_merge_time / num_merged_pulls_with_time
-    else:
-        repo_data['avg_time_to_merge_pr'] = None
-    if num_pulls_with_first_review > 0:
-        repo_data['avg_time_to_first_review_pr'] = total_first_review_time / num_pulls_with_first_review
-    else:
-        repo_data['avg_time_to_first_review_pr'] = None
-    if repo_data['total_pull_requests'] > 0:
-        repo_data['pr_merge_percentage'] = (len(merged_pulls) / repo_data['total_pull_requests']) * 100
-    else:
-        repo_data['pr_merge_percentage'] = None
+    repo_data['avg_time_to_merge_pr'] = (total_merge_time / num_merged_pulls_with_time) if num_merged_pulls_with_time > 0 else None
+    repo_data['avg_time_to_first_review_pr'] = (total_first_review_time / num_pulls_with_first_review) if num_pulls_with_first_review > 0 else None
+    repo_data['pr_merge_percentage'] = ((len(merged_pulls) / repo_data['total_pull_requests']) * 100) if repo_data['total_pull_requests'] > 0 else None
     # Calculate pull request update frequency
-    pr_dates = [datetime.strptime(pr['created_at'], "%Y-%m-%dT%H:%M:%SZ") for pr in pulls]
+    pr_dates = []
+    for pr in pulls:
+        try:
+            pr_dates.append(datetime.strptime(pr['created_at'], "%Y-%m-%dT%H:%M:%SZ"))
+        except Exception as e:
+            logging.error(f"Error parsing pull request date: {e}")
     if len(pr_dates) > 1:
         pr_dates.sort()
         time_differences = [(pr_dates[i+1] - pr_dates[i]).total_seconds() / 3600 for i in range(len(pr_dates)-1)]
@@ -533,24 +626,25 @@ def collect_github_data(repo_owner, repo_name):
     total_first_response_time_pr = 0
     num_pulls_with_first_response = 0
     for pr in pulls:
-        created_at = datetime.strptime(pr['created_at'], "%Y-%m-%dT%H:%M:%SZ")
-        comments_url = pr['comments_url']
-        comments_response = make_api_request(comments_url, headers)
-        if comments_response and comments_response.status_code == 200:
-            comments = comments_response.json()
-            if comments:
-                first_comment = comments[0]
-                first_response_at = datetime.strptime(first_comment['created_at'], "%Y-%m-%dT%H:%M:%SZ")
-                first_response_time = (first_response_at - created_at).total_seconds() / 3600  # in hours
-                total_first_response_time_pr += first_response_time
-                num_pulls_with_first_response += 1
-    if num_pulls_with_first_response > 0:
-        repo_data['avg_time_to_first_response_pr'] = total_first_response_time_pr / num_pulls_with_first_response
-    else:
-        repo_data['avg_time_to_first_response_pr'] = None
+        try:
+            created_at = datetime.strptime(pr['created_at'], "%Y-%m-%dT%H:%M:%SZ")
+            comments_url = pr.get('comments_url')
+            if comments_url:
+                comments_response = make_api_request(comments_url, headers=headers)
+                if comments_response and comments_response.status_code == 200:
+                    comments = comments_response.json()
+                    if comments:
+                        first_comment = comments[0]
+                        first_response_at = datetime.strptime(first_comment['created_at'], "%Y-%m-%dT%H:%M:%SZ")
+                        first_response_time = (first_response_at - created_at).total_seconds() / 3600  # in hours
+                        total_first_response_time_pr += first_response_time
+                        num_pulls_with_first_response += 1
+        except Exception as e:
+            logging.error(f"Error processing pull request response time: {e}")
+    repo_data['avg_time_to_first_response_pr'] = (total_first_response_time_pr / num_pulls_with_first_response) if num_pulls_with_first_response > 0 else None
     # Get languages
     languages_url = f"{base_url}/languages"
-    response = make_api_request(languages_url, headers)
+    response = make_api_request(languages_url, headers=headers)
     if response is None:
         logging.error("Failed to fetch languages.")
         repo_data['languages'] = {}
@@ -565,7 +659,7 @@ def collect_github_data(repo_owner, repo_name):
             repo_data['language_percentages'] = {}
     # Get total downloads from releases
     releases_url = f"{base_url}/releases"
-    response = make_api_request(releases_url, headers)
+    response = make_api_request(releases_url, headers=headers)
     if response is None:
         logging.error("Failed to fetch releases.")
         repo_data['total_downloads'] = 0
@@ -580,11 +674,12 @@ def collect_github_data(repo_owner, repo_name):
     # Recent activity (past 60 days)
     since_date = (datetime.utcnow() - timedelta(days=60)).isoformat() + 'Z'
     # Recent commits
-    commits_url = f"{base_url}/commits?since={since_date}&per_page=100"
+    commits_url = f"{base_url}/commits"
     commits = []
     page = 1
     while True:
-        response = make_api_request(f"{commits_url}&page={page}", headers)
+        params = {"since": since_date, "per_page": 100, "page": page}
+        response = make_api_request(commits_url, headers=headers, params=params)
         if response is None or response.status_code != 200:
             break
         page_commits = response.json()
@@ -598,14 +693,15 @@ def collect_github_data(repo_owner, repo_name):
     for commit in commits:
         author = commit.get('author')
         if author:
-            contributors_set_recent.add(author['login'])
+            contributors_set_recent.add(author.get('login'))
     repo_data['recent_active_contributors'] = len(contributors_set_recent)
     # Recent issues opened and closed
-    recent_issues_url = f"{base_url}/issues?since={since_date}&state=all&per_page=100"
+    recent_issues_url = f"{base_url}/issues"
     recent_issues = []
     page = 1
     while True:
-        response = make_api_request(f"{recent_issues_url}&page={page}", headers)
+        params = {"since": since_date, "state": "all", "per_page": 100, "page": page}
+        response = make_api_request(recent_issues_url, headers=headers, params=params)
         if response is None or response.status_code != 200:
             break
         page_issues = response.json()
@@ -613,16 +709,17 @@ def collect_github_data(repo_owner, repo_name):
             break
         recent_issues.extend(page_issues)
         page += 1
-    recent_issues_opened = [issue for issue in recent_issues if 'pull_request' not in issue and issue['created_at'] >= since_date]
-    recent_issues_closed = [issue for issue in recent_issues_opened if issue.get('closed_at') and issue['closed_at'] >= since_date]
+    recent_issues_opened = [issue for issue in recent_issues if 'pull_request' not in issue and issue.get('created_at', '') >= since_date]
+    recent_issues_closed = [issue for issue in recent_issues_opened if issue.get('closed_at', '') >= since_date]
     repo_data['recent_issues_opened'] = len(recent_issues_opened)
     repo_data['recent_issues_closed'] = len(recent_issues_closed)
     # Recent pull requests opened and merged
-    recent_pulls_url = f"{base_url}/pulls?state=all&per_page=100"
+    recent_pulls_url = f"{base_url}/pulls"
     recent_pulls = []
     page = 1
     while True:
-        response = make_api_request(f"{recent_pulls_url}&page={page}", headers)
+        params = {"state": "all", "per_page": 100, "page": page}
+        response = make_api_request(recent_pulls_url, headers=headers, params=params)
         if response is None or response.status_code != 200:
             break
         page_pulls = response.json()
@@ -630,28 +727,28 @@ def collect_github_data(repo_owner, repo_name):
             break
         recent_pulls.extend(page_pulls)
         page += 1
-    recent_pulls_opened = [pr for pr in recent_pulls if pr['created_at'] >= since_date]
+    recent_pulls_opened = [pr for pr in recent_pulls if pr.get('created_at', '') >= since_date]
     recent_pulls_merged = []
     for pr in recent_pulls_opened:
-        pr_details_response = make_api_request(pr['url'], headers)
+        pr_details_response = make_api_request(pr.get('url'), headers=headers)
         if pr_details_response and pr_details_response.status_code == 200:
             pr_details = pr_details_response.json()
-            if pr_details.get('merged_at') and pr_details['merged_at'] >= since_date:
+            if pr_details.get('merged_at', '') >= since_date:
                 recent_pulls_merged.append(pr)
     repo_data['recent_pulls_opened'] = len(recent_pulls_opened)
     repo_data['recent_pulls_merged'] = len(recent_pulls_merged)
     # Add the repository URL
     repo_data['url'] = f"https://github.com/{repo_owner}/{repo_name}"
     # Add to projects list
-    projects_list.append(repo_data)
+    PROJECTS_LIST.append(repo_data)
     logging.info(f"GitHub data collected for '{repo_owner}/{repo_name}'")
     return repo_data
 
-def main():
-    global YOUR_EMAIL
-    global RECORD_LIMIT
-    global MAX_DEPTH
-    global GITHUB_TOKEN
+def run_repo_cite() -> None:
+    """
+    Main function to run the repository citation data collection process.
+    """
+    global OPENALEX_EMAIL, RECORD_LIMIT, MAX_DEPTH, GITHUB_TOKEN
 
     logging.info("Script started")
     try:
@@ -664,15 +761,23 @@ def main():
         repo_owner, repo_name = match.groups()
 
         # Optional: Prompt for email and record limit
-        YOUR_EMAIL_INPUT = input("Enter your email for OpenAlex API (optional): ").strip()
-        if YOUR_EMAIL_INPUT:
-            YOUR_EMAIL = YOUR_EMAIL_INPUT
-        RECORD_LIMIT_INPUT = input("Enter number of records to retrieve per API call (integer or 'all') [default is 'all']: ").strip()
-        if RECORD_LIMIT_INPUT:
-            RECORD_LIMIT = int(RECORD_LIMIT_INPUT) if RECORD_LIMIT_INPUT.isdigit() else 'all'
-        MAX_DEPTH_INPUT = input("Enter maximum depth for citation traversal (integer) [default is 2]: ").strip()
-        if MAX_DEPTH_INPUT:
-            MAX_DEPTH = int(MAX_DEPTH_INPUT)
+        email_input = input("Enter your email for OpenAlex API (optional): ").strip()
+        if email_input:
+            OPENALEX_EMAIL = email_input
+        record_limit_input = input("Enter number of records to retrieve per API call (integer, 0 for all) [default is 0]: ").strip()
+        if record_limit_input:
+            if record_limit_input.isdigit():
+                RECORD_LIMIT = int(record_limit_input)
+            else:
+                logging.warning("Invalid record limit input. Using default (0 for all).")
+                RECORD_LIMIT = 0
+        max_depth_input = input("Enter maximum depth for citation traversal (integer) [default is 2]: ").strip()
+        if max_depth_input:
+            if max_depth_input.isdigit():
+                MAX_DEPTH = int(max_depth_input)
+            else:
+                logging.warning("Invalid max depth input. Using default (2).")
+                MAX_DEPTH = 2
 
         # Ensure GitHub token is available
         if not GITHUB_TOKEN:
@@ -698,24 +803,24 @@ def main():
 
         original_paper_id = paper_data.get('id')
 
-        # Get authors from the original paper
+        # Get authors from the original paper and fetch their papers
         authors_data = paper_data.get('authorships', [])
         for author_entry in authors_data:
             author_data = author_entry.get('author', {})
             author_id = author_data.get('id')
-            # Get papers by the author
-            get_papers_by_author(author_id)
+            if author_id:
+                get_papers_by_author(author_id)
 
         # Start iterative citation gathering
         iterative_citation_gathering(original_paper_id)
 
         # Prepare the output data
         output_data = {
-            'people': list(authors_dict.values()),
-            'papers': list(papers_dict.values()),
-            'institutions': list(institutions_dict.values()),
-            'topics': list(topics_dict.values()),
-            'projects': projects_list
+            'people': list(AUTHORS_DICT.values()),
+            'papers': list(PAPERS_DICT.values()),
+            'institutions': list(INSTITUTIONS_DICT.values()),
+            'topics': list(TOPICS_DICT.values()),
+            'projects': PROJECTS_LIST
         }
 
         # Save to JSON file
@@ -732,19 +837,16 @@ def main():
 
     except KeyboardInterrupt:
         logging.warning("Process interrupted by user. Saving collected data.")
-        # Save partial data
         output_data = {
-            'people': list(authors_dict.values()),
-            'papers': list(papers_dict.values()),
-            'institutions': list(institutions_dict.values()),
-            'topics': list(topics_dict.values()),
-            'projects': projects_list
+            'people': list(AUTHORS_DICT.values()),
+            'papers': list(PAPERS_DICT.values()),
+            'institutions': list(INSTITUTIONS_DICT.values()),
+            'topics': list(TOPICS_DICT.values()),
+            'projects': PROJECTS_LIST
         }
         with open('output_data_partial.json', 'w') as f:
             json.dump(output_data, f, indent=2)
         logging.info("Partial data saved to 'output_data_partial.json'.")
-
-        # Log the total number of nodes collected before interruption
         logging.info(f"Total number of papers collected: {len(output_data['papers'])}")
         logging.info(f"Total number of people collected: {len(output_data['people'])}")
         logging.info(f"Total number of institutions collected: {len(output_data['institutions'])}")
@@ -752,4 +854,4 @@ def main():
         logging.info(f"Total number of projects collected: {len(output_data['projects'])}")
 
 if __name__ == "__main__":
-    main()
+    run_repo_cite()
