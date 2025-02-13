@@ -358,14 +358,14 @@ def write_to_csv():
     """
     with shared_resources.lock:
         shared_resources.institution_df.to_csv(
-            'ecosystms_output_institutions.csv', index=False
+            'institutions.csv', index=False
         )
-        shared_resources.people_df.to_csv('ecosystms_output_people.csv', index=False)
-        shared_resources.paper_df.to_csv('ecosystms_output_papers.csv', index=False)
-        shared_resources.project_df.to_csv('ecosystms_output_projects.csv', index=False)
-        shared_resources.sdg_df.to_csv('ecosystms_output_sdgs.csv', index=False)
-        shared_resources.concept_df.to_csv('ecosystms_output_concepts.csv', index=False)
-        shared_resources.domain_df.to_csv('ecosystms_output_domains.csv', index=False)
+        shared_resources.people_df.to_csv('people.csv', index=False)
+        shared_resources.paper_df.to_csv('papers.csv', index=False)
+        shared_resources.project_df.to_csv('projects.csv', index=False)
+        shared_resources.sdg_df.to_csv('sdgs.csv', index=False)
+        shared_resources.concept_df.to_csv('concepts.csv', index=False)
+        shared_resources.domain_df.to_csv('domains.csv', index=False)
 
         shared_resources.institution_df.to_csv(
             'ecosystms_output_full.csv', index=False, mode='w'
