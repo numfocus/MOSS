@@ -1,0 +1,28 @@
+{
+  "@context": "publication_schema.jsonld",
+  "@id": "publication:example-publication",
+  "@type": "schema:ScholarlyArticle",
+  "title": "Example Publication Title",
+  "abstract": "This is an example abstract for a publication.",
+  "datePublished": "2023-11-20",
+  "url": "https://example.com/publication/example-publication",
+  "doi": "10.xxxx/example-publication",
+  "keywords": [
+    "example",
+    "publication",
+    "research"
+  ],
+  "author": [
+    "http://example.org/person/author1",
+    "http://example.org/person/author2"
+  ],
+  "codeRepository": [
+    "gh:repo1",
+    "gh:repo2"
+  ],
+  "isPartOf": {
+    "@type": "schema:Periodical",
+    "name": "Example Journal",
+    "url": "https://example.com/journal"
+  }
+}

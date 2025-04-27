@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/GithubUser.schema.json",
+  "title": "GithubUser",
+  "description": "Schema for a GitHub User, either an individual or organization.",
+  "type": "object",
+  "properties": {
+    "github_id": {
+      "type": "integer",
+      "description": "The unique identifier of the entity."
+    },
+    "login": {
+      "type": "string",
+      "description": "The user's GitHub login name.",
+      "examples": ["octocat"]
+    },
+    "node_id": {
+      "type": "string",
+      "description": "The user's GitHub node ID.",
+      "examples": ["MDQ6VXNlcjE="]
+    },
+    "avatar_url": {
+      "type": "string",
+      "description": "URL to the user's avatar image.",
+      "format": "uri",
+      "examples": ["https://avatars.githubusercontent.com/u/1?v=4"]
+    },
+    "gravatar_id": {
+      "type": ["string", "null"],
+      "description": "The user's Gravatar ID."
+    },
+    "url": {
+      "type": "string",
+      "description": "The user's GitHub API URL.",
+      "format": "uri",
+      "examples": ["https://api.github.com/users/octocat"]
+    },
+    "html_url": {
+      "type": "string",
+      "description": "The user's GitHub profile URL.",
+      "format": "uri",
+      "examples": ["https://github.com/octocat"]
+    },
+    "followers_url": {
+      "type": "string",
+      "description": "URL to the user's followers.",
+      "format": "uri",
+      "examples": ["https://api.github.com/users/octocat/followers"]
+    },
+    "following_url": {
+      "type": "string",
+      "description": "URL to the user's following list.",
+      "format": "uri",
+      "examples": [
+        "https://api.github.com/users/octocat/following{/other_user}"
+      ]
+    },
+    "gists_url": {
+      "type": "string",
+      "description": "URL to the user's gists.",
+      "format": "uri",
+      "examples": ["https://api.github.com/users/octocat/gists{/gist_id}"]
+    },
+    "starred_url": {
+      "type": "string",
+      "description": "URL to the user's starred repositories.",
+      "format": "uri",
+      "examples": [
+        "https://api.github.com/users/octocat/starred{/owner}{/repo}"
+      ]
+    },
+    "subscriptions_url": {
+      "type": "string",
+      "description": "URL to the user's subscriptions.",
+      "format": "uri",
+      "examples": ["https://api.github.com/users/octocat/subscriptions"]
+    },
+    "organizations_url": {
+      "type": "string",
+      "description": "URL to the user's organizations.",
+      "format": "uri",
+      "examples": ["https://api.github.com/users/octocat/orgs"]
+    },
+    "repos_url": {
+      "type": "string",
+      "description": "URL to the user's repositories.",
+      "format": "uri",
+      "examples": ["https://api.github.com/users/octocat/repos"]
+    },
+    "events_url": {
+      "type": "string",
+      "description": "URL to the user's events.",
+      "format": "uri",
+      "examples": ["https://api.github.com/users/octocat/events{/privacy}"]
+    },
+    "received_events_url": {
+      "type": "string",
+      "description": "URL to the user's received events.",
+      "format": "uri",
+      "examples": ["https://api.github.com/users/octocat/received_events"]
+    },
+    "type": {
+      "type": "string",
+      "description": "The type of the user (e.g., 'User', 'Organization').",
+      "enum": ["User", "Organization"]
+    },
+    "site_admin": {
+      "type": "boolean",
+      "description": "Whether the user is a site administrator.",
+      "examples": [false]
+    },
+    "name": {
+      "type": ["string", "null"],
+      "description": "The user's full name.",
+      "examples": ["The Octocat"]
+    },
+    "company": {
+      "type": ["string", "null"],
+      "description": "The user's company.",
+      "examples": ["GitHub"]
+    },
+    "blog": {
+      "type": ["string", "null"],
+      "description": "The user's blog URL.",
+      "format": "uri",
+      "examples": ["https://github.blog"]
+    },
+    "location": {
+      "type": ["string", "null"],
+      "description": "The user's location.",
+      "examples": ["San Francisco"]
+    },
+    "email": {
+      "type": ["string", "null"],
+      "description": "The user's email address.",
+      "format": "email",
+      "examples": ["octocat@github.com"]
+    },
+    "hireable": {
+      "type": ["boolean", "null"],
+      "description": "Whether or not the user has marked themselves as for hire",
+      "examples": [true]
+    },
+    "bio": {
+      "type": ["string", "null"],
+      "description": "The user's bio.",
+      "examples": ["There once was..."]
+    },
+    "twitter_username": {
+      "type": ["string", "null"],
+      "description": "The user's Twitter username.",
+      "examples": ["octocat"]
+    },
+    "public_repos": {
+      "type": "integer",
+      "description": "The number of public repositories the user has.",
+      "examples": [8]
+    },
+    "public_gists": {
+      "type": "integer",
+      "description": "The number of public gists the user has.",
+      "examples": [8]
+    },
+    "followers": {
+      "type": "integer",
+      "description": "The number of followers the user has.",
+      "examples": [4500]
+    },
+    "following": {
+      "type": "integer",
+      "description": "The number of users the user is following.",
+      "examples": [9]
+    },
+    "created_at": {
+      "type": "string",
+      "description": "The date and time the user's account was created.",
+      "format": "date-time",
+      "examples": ["2008-01-14T04:33:35Z"]
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "The date and time the user's account was last updated.",
+      "format": "date-time",
+      "examples": ["2008-01-14T04:33:35Z"]
+    }
+  },
+  "required": [
+    "id",
+    "github_id",
+    "createdAt",
+    "updatedAt",
+    "login",
+    "node_id",
+    "avatar_url",
+    "url",
+    "html_url",
+    "followers_url",
+    "following_url",
+    "gists_url",
+    "starred_url",
+    "subscriptions_url",
+    "organizations_url",
+    "repos_url",
+    "events_url",
+    "received_events_url",
+    "type",
+    "site_admin",
+    "public_repos",
+    "public_gists",
+    "followers",
+    "following",
+    "created_at",
+    "updated_at"
+  ],
+  "additionalProperties": true
+}

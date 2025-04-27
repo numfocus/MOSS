@@ -1,0 +1,4 @@
+VITE_SURREAL_ENDPOINT=indxdb://demo
+VITE_SURREAL_NS=test
+VITE_SURREAL_DB=test
+VITE_GITHUB_TOKEN=github_pat_

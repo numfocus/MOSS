@@ -1,23 +1,41 @@
-# Map of Open Source Science (MOSS)
-MOSS is a project of [OSSci](https://www.opensource.science/), an initiative of [NumFOCUS](https://numfocus.org/).
 
+## Local set up
+### Install fnm (Fast Node Manager)
+[fnm](https://github.com/Schniz/fnm)
 
-## Overview
-  This project aims to visualize the intersection of open source software and scientific research.
+### Install Node
+```bash
+fnm install 23
+fnm use 23
+```
 
-> The Map of Open Source Science is a proof of concept and as such, nothing is accurate.
+### Install Bun
+[Bun](https://bun.sh/docs/installation)
 
+### Use Bun to install dependencies
+```bash
+bun install
+```
 
-## [Getting Started](./scripts/README.md)
+### Update .env with Github API key
+[Generate Github API](https://github.com/settings/personal-access-tokens)
+[Github API Docs](https://docs.github.com/en)
 
+### Start local application
+```bash
+bun dev run
+```
 
-## Goal
-Here is an earlier iteration built using Kumu. We want to build something similar but better.
- - [kumu instance](https://embed.kumu.io/6cbeee6faebd8cc57590da7b83c4d457#default)
- - [demo video](https://www.youtube.com/watch?v=jZyLSRCba_M)
+## Current functionality overview
+1. Bottom right, show DB status, connect to db
+2. In Data Worker, enter a github user login, Add task
+3. refresh queue
+4. execute task
+5. In View, click refresh users to see the fretched data
+6. click fetch repos to get all repos of this user
 
-## Data Sources
+- DataView, back and forth between users, their repos, and collaborators thereof spawns a bigraph
 
-## Contributing
-We are using the [fork and pull](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/getting-started/about-collaborative-development-models#fork-and-pull-model) collaborative development model, we welcome [pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork). 
-- Check issues for anything to work on
+- Graph View
+
+- Schema Manager, other file formats

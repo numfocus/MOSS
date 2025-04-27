@@ -1,0 +1,470 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/GithubRepo.schema.json",
+  "title": "GithubRepo",
+  "description": "Schema for a Github repository",
+  "type": "object",
+  "properties": {
+    "github_id": {
+      "type": "integer",
+      "description": "Global ID of the repository"
+    },
+    "node_id": {
+      "type": "string",
+      "description": "The GraphQL node ID of the repository"
+    },
+    "name": {
+      "type": "string",
+      "description": "The name of the repository",
+      "examples": ["my-awesome-repo"]
+    },
+    "full_name": {
+      "type": "string",
+      "description": "The repository owner with repo name (e.g., owner/repo)"
+    },
+    "owner": {
+      "type": "string",
+      "description": "The login of the owner of the repository (username or organization)",
+      "examples": ["jeffbum"]
+    },
+    "description": {
+      "type": ["string", "null"],
+      "description": "A short description of the repository",
+      "examples": ["This is a test repository"]
+    },
+    "private": {
+      "type": "boolean",
+      "description": "Whether the repository is private"
+    },
+    "fork": {
+      "type": "boolean",
+      "description": "Whether the repository is a fork"
+    },
+    "url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository"
+    },
+    "forks_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's forks"
+    },
+    "keys_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's keys"
+    },
+    "collaborators_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's collaborators"
+    },
+    "teams_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's teams"
+    },
+    "hooks_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's hooks"
+    },
+    "issue_events_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's issue events"
+    },
+    "events_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's events"
+    },
+    "assignees_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's assignees"
+    },
+    "branches_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's branches"
+    },
+    "tags_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's tags"
+    },
+    "blobs_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's blobs"
+    },
+    "git_tags_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's git tags"
+    },
+    "git_refs_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's git refs"
+    },
+    "trees_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's trees"
+    },
+    "statuses_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's statuses"
+    },
+    "languages_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's languages"
+    },
+    "stargazers_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's stargazers"
+    },
+    "contributors_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's contributors"
+    },
+    "subscribers_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's subscribers"
+    },
+    "subscription_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's subscription"
+    },
+    "commits_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's commits"
+    },
+    "git_commits_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's git commits"
+    },
+    "comments_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's comments"
+    },
+    "issue_comment_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's issue comments"
+    },
+    "contents_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's contents"
+    },
+    "compare_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's compare"
+    },
+    "merges_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's merges"
+    },
+    "archive_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's archive"
+    },
+    "downloads_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's downloads"
+    },
+    "issues_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's issues"
+    },
+    "pulls_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's pulls"
+    },
+    "milestones_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's milestones"
+    },
+    "notifications_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's notifications"
+    },
+    "labels_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's labels"
+    },
+    "releases_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's releases"
+    },
+    "deployments_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The API URL of the repository's deployments"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The date and time the repository was created"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The date and time the repository was last updated"
+    },
+    "pushed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The date and time the repository was last pushed to"
+    },
+    "git_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The git URL of the repository"
+    },
+    "ssh_url": {
+      "type": "string",
+      "description": "The SSH URL of the repository"
+    },
+    "clone_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The clone URL of the repository"
+    },
+    "svn_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The SVN URL of the repository"
+    },
+    "homepage": {
+      "type": ["string", "null"],
+      "format": "URL",
+      "description": "The homepage of the repository"
+    },
+    "size": {
+      "type": "integer",
+      "description": "The size of the repository"
+    },
+    "stargazers_count": {
+      "type": "integer",
+      "description": "The number of stars the repository has"
+    },
+    "watchers_count": {
+      "type": "integer",
+      "description": "The number of watchers the repository has"
+    },
+    "language": {
+      "type": ["string", "null"],
+      "description": "The programming language used in the repository",
+      "examples": ["python"]
+    },
+    "has_issues": {
+      "type": "boolean",
+      "description": "Whether the repository has issues enabled"
+    },
+    "has_projects": {
+      "type": "boolean",
+      "description": "Whether the repository has projects enabled"
+    },
+    "has_downloads": {
+      "type": "boolean",
+      "description": "Whether the repository has downloads enabled"
+    },
+    "has_wiki": {
+      "type": "boolean",
+      "description": "Whether the repository has a wiki enabled"
+    },
+    "has_pages": {
+      "type": "boolean",
+      "description": "Whether the repository has pages enabled"
+    },
+    "has_discussions": {
+      "type": "boolean",
+      "description": "Whether the repository has discussions enabled"
+    },
+    "forks_count": {
+      "type": "integer",
+      "description": "The number of forks the repository has"
+    },
+    "mirror_url": {
+      "type": ["string", "null"],
+      "format": "URL",
+      "description": "The mirror URL of the repository"
+    },
+    "archived": {
+      "type": "boolean",
+      "description": "Whether the repository is archived"
+    },
+    "disabled": {
+      "type": "boolean",
+      "description": "Whether the repository is disabled"
+    },
+    "open_issues_count": {
+      "type": "integer",
+      "description": "The number of open issues the repository has"
+    },
+    "license": {
+      "type": ["string", "null"],
+      "description": "The license used in the repository",
+      "examples": ["MIT"]
+    },
+    "allow_forking": {
+      "type": "boolean",
+      "description": "Whether the repository allows forking"
+    },
+    "is_template": {
+      "type": "boolean",
+      "description": "Whether the repository is a template"
+    },
+    "web_commit_signoff_required": {
+      "type": "boolean",
+      "description": "Whether web commit signoff is required"
+    },
+    "topics": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "A list of topics associated with the repository",
+      "examples": ["example", "topic"]
+    },
+    "visibility": {
+      "type": "string",
+      "description": "The visibility of the repository"
+    },
+    "forks": {
+      "type": "integer",
+      "description": "The number of forks the repository has"
+    },
+    "open_issues": {
+      "type": "integer",
+      "description": "The number of open issues the repository has"
+    },
+    "watchers": {
+      "type": "integer",
+      "description": "The number of watchers the repository has"
+    },
+    "default_branch": {
+      "type": "string",
+      "description": "The default branch of the repository"
+    },
+    "temp_clone_token": {
+      "type": ["string", "null"],
+      "description": "The temporary clone token of the repository"
+    },
+    "network_count": {
+      "type": "integer",
+      "description": "The network count of the repository"
+    },
+    "subscribers_count": {
+      "type": "integer",
+      "description": "The number of subscribers the repository has"
+    },
+    "html_url": {
+      "type": "string",
+      "format": "URL",
+      "description": "The URL of the repository",
+      "examples": ["https://github.com/octocat/my-awesome-repo"]
+    }
+  },
+  "required": [
+    "github_id",
+    "node_id",
+    "name",
+    "full_name",
+    "owner",
+    "private",
+    "html_url",
+    "fork",
+    "url",
+    "forks_url",
+    "keys_url",
+    "collaborators_url",
+    "teams_url",
+    "hooks_url",
+    "issue_events_url",
+    "events_url",
+    "assignees_url",
+    "branches_url",
+    "tags_url",
+    "blobs_url",
+    "git_tags_url",
+    "git_refs_url",
+    "trees_url",
+    "statuses_url",
+    "languages_url",
+    "stargazers_url",
+    "contributors_url",
+    "subscribers_url",
+    "subscription_url",
+    "commits_url",
+    "git_commits_url",
+    "comments_url",
+    "issue_comment_url",
+    "contents_url",
+    "compare_url",
+    "merges_url",
+    "archive_url",
+    "downloads_url",
+    "issues_url",
+    "pulls_url",
+    "milestones_url",
+    "notifications_url",
+    "labels_url",
+    "releases_url",
+    "deployments_url",
+    "created_at",
+    "updated_at",
+    "pushed_at",
+    "git_url",
+    "ssh_url",
+    "clone_url",
+    "svn_url",
+    "size",
+    "stargazers_count",
+    "watchers_count",
+    "has_issues",
+    "has_projects",
+    "has_downloads",
+    "has_wiki",
+    "has_pages",
+    "has_discussions",
+    "forks_count",
+    "archived",
+    "disabled",
+    "open_issues_count",
+    "allow_forking",
+    "is_template",
+    "web_commit_signoff_required",
+    "visibility",
+    "forks",
+    "open_issues",
+    "watchers",
+    "default_branch",
+    "network_count",
+    "subscribers_count"
+  ]
+}

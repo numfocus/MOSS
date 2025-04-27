@@ -1,0 +1,61 @@
+{
+  "@context": "person_schema.jsonld",
+  "@id": "person:john-doe",
+  "@type": "schema:Person",
+  "name": "John Doe",
+  "givenName": "John",
+  "familyName": "Doe",
+  "email": "john.doe@example.edu",
+	"orcid": "orcid:0000-0001-2345-6789",
+  "researchGate": "researchGate:johndoe",
+  "googleScholar": "googleScholar:abcdefg",
+	"researchArea": ["Artificial Intelligence", "Machine Learning"],
+  "affiliation": {
+    "@type": "schema:Organization",
+    "name": "Example University"
+  },
+  "sameAs": [
+    "https://github.com/johndoe"
+  ],
+	"memberOf": "http://example.org/department/ai",
+	"alumniOf": "http://example.org/university/old",
+  "educationalCredentialAwarded": "PhD in Computer Science",
+
+  "authorOf": [
+    {
+      "@id": "publication:paper1",
+      "@type": "schema:ScholarlyArticle",
+      "title": "A Groundbreaking Study",
+      "abstract": "This paper presents...",
+      "datePublished": "2023-10-26",
+      "keywords": ["research", "study", "science"]
+    },
+    {
+      "@id": "publication:paper2",
+      "@type": "schema:ScholarlyArticle",
+      "title": "Another Great Paper",
+      "abstract": "This paper is also great...",
+      "datePublished": "2022-05-15",
+      "keywords": ["research", "paper", "science"]
+    }
+  ],
+  "contributorTo": [
+    {
+      "@id": "software:repo1",
+      "@type": "schema:SoftwareSourceCode",
+      "name": "Awesome Project",
+      "description": "An open-source research software project.",
+      "codeRepository": "https://github.com/org/awesome-project",
+      "keywords": ["open-source", "research", "software"]
+    },
+    {
+      "@id": "software:repo2",
+      "@type": "schema:SoftwareSourceCode",
+      "name": "Another Great Project",
+      "description": "Another open-source research software project.",
+      "codeRepository": "https://github.com/org/another-project",
+      "keywords": ["open-source", "research", "software"]
+    }
+  ],
+	"mentorOf": "http://example.org/person/jane-doe"
+}

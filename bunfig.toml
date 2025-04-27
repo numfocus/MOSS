@@ -1,0 +1,6 @@
+[build]
+target = "esnext"
+# outdir = "./dist"
+
+[install]
+# node-modules-dir = "./my-node_modules"
