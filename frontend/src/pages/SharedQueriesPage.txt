@@ -1,0 +1,1231 @@
+// --- UPDATED FILE: frontend/src/pages/SharedQueriesPage.tsx ---
+import React, { useState, useEffect, useCallback, ChangeEvent, FormEvent, useMemo } from 'react';
+// import { Link } from 'react-router-dom';
+import {
+    // Analysis Recipes
+    getAnalysisRecipes,
+    executeAnalysisRecipe,
+    type RecipeExecutionResponse, // Use import type if only type is needed
+    // Affiliation Workflow
+    getAffiliationAlgorithms,
+    getInstitutionAffiliationResults,
+    executeAffiliationAlgorithm,
+    searchInstitutions,
+    getIngestionHistoryContext,
+    type InstitutionSummary, // Use import type
+    type AffiliationResultResponse, // Use import type
+    type AffiliationExecutionResponse, // Use import type
+    type IngestionHistoryContextResponse, // Use import type
+    // Discovery Workflow
+    getDiscoveryAlgorithms,
+    executeDiscoveryAlgorithm,
+    triggerUrlIngestion, // Reuse ingestion trigger
+    // Shared Types
+    type RecipeMetadataResponse, // Use import type
+    type RecipeParameterMetadataResponse, // Use import type
+    // DiscoveryExecutionResponse, // Removed unused import
+    type DiscoveryExecutionRequest // Use import type
+} from '../services/apiClient'; // Adjust path as needed
+import LoadingSpinner, { type LoadingSpinnerProps } from '../components/LoadingSpinner'; // Use import type
+import ErrorMessage, { type ErrorMessageProps } from '../components/ErrorMessage'; // Use import type
+// --- Use import type for interfaces ---
+import SimpleTable, { type TableColumn } from '../components/SimpleTable';
+// --- End import type ---
+import './SharedQueriesPage.css'; // Make sure CSS is imported
+
+// Type for form parameters
+type FormParams = Record<string, any>;
+
+// Type for workflow stage control
+type WorkflowStage = 'initial' | 'affiliation_setup' | 'analysis_selection';
+
+// Interface matching the structure *inside* the 'data' field of RecipeExecutionResponse
+interface NestedResultData {
+    result_type?: string;
+    data?: any;
+    notes?: string[] | string | null; // Allow string or list for notes
+}
+
+const SharedQueriesPage: React.FC = () => {
+    // --- State for Workflow Control ---
+    const [workflowStage, setWorkflowStage] = useState<WorkflowStage>('initial');
+
+    // --- State for Analysis Recipe Workflow ---
+    const [analysisRecipes, setAnalysisRecipes] = useState<RecipeMetadataResponse[]>([]);
+    const [selectedAnalysisRecipe, setSelectedAnalysisRecipe] = useState<RecipeMetadataResponse | null>(null);
+    const [analysisParams, setAnalysisParams] = useState<FormParams>({});
+    const [isAnalysisExecuting, setIsAnalysisExecuting] = useState<boolean>(false);
+    const [analysisExecutionResult, setAnalysisExecutionResult] = useState<RecipeExecutionResponse | null>(null);
+    const [analysisExecutionError, setAnalysisExecutionError] = useState<string | null>(null);
+    const [isAnalysisLoading, setIsAnalysisLoading] = useState<boolean>(true);
+    const [analysisError, setAnalysisError] = useState<string | null>(null);
+
+    // --- State for Affiliation Workflow ---
+    const [institutionQuery, setInstitutionQuery] = useState<string>('');
+    const [institutionSearchResults, setInstitutionSearchResults] = useState<InstitutionSummary[]>([]);
+    const [selectedInstitution, setSelectedInstitution] = useState<InstitutionSummary | null>(null);
+    const [affiliationAlgorithms, setAffiliationAlgorithms] = useState<RecipeMetadataResponse[]>([]);
+    const [selectedAffiliationAlgorithm, setSelectedAffiliationAlgorithm] = useState<RecipeMetadataResponse | null>(null);
+    const [affiliationParams, setAffiliationParams] = useState<FormParams>({});
+    const [isAffiliationExecuting, setIsAffiliationExecuting] = useState<boolean>(false);
+    const [affiliationExecutionResult, setAffiliationExecutionResult] = useState<AffiliationExecutionResponse | null>(null);
+    const [affiliationExecutionError, setAffiliationExecutionError] = useState<string | null>(null);
+    const [affiliationResults, setAffiliationResults] = useState<AffiliationResultResponse[]>([]);
+    const [isAffiliationResultsLoading, setIsAffiliationResultsLoading] = useState<boolean>(false);
+    const [affiliationResultsError, setAffiliationResultsError] = useState<string | null>(null);
+    const [ingestionContext, setIngestionContext] = useState<IngestionHistoryContextResponse | null>(null);
+    const [isIngestionContextLoading, setIsIngestionContextLoading] = useState<boolean>(false);
+    const [ingestionContextError, setIngestionContextError] = useState<string | null>(null);
+    const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.5);
+    const [isAffiliationLoading, setIsAffiliationLoading] = useState<boolean>(false);
+    const [affiliationError, setAffiliationError] = useState<string | null>(null);
+    const [selectedRepositoryIds, setSelectedRepositoryIds] = useState<number[]>([]);
+
+    // --- State for Discovery Workflow ---
+    const [showDiscoverySection, setShowDiscoverySection] = useState(false);
+    const [discoveryAlgorithms, setDiscoveryAlgorithms] = useState<RecipeMetadataResponse[]>([]);
+    const [isDiscoveryAlgosLoading, setIsDiscoveryAlgosLoading] = useState(false);
+    const [discoveryAlgosError, setDiscoveryAlgosError] = useState<string | null>(null);
+    const [selectedDiscoveryAlgorithm, setSelectedDiscoveryAlgorithm] = useState<RecipeMetadataResponse | null>(null);
+    const [discoveryParams, setDiscoveryParams] = useState<FormParams>({});
+    const [isDiscovering, setIsDiscovering] = useState(false);
+    const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+    const [candidateUrls, setCandidateUrls] = useState<string[] | null>(null);
+    const [selectedUrlsToIngest, setSelectedUrlsToIngest] = useState<Record<string, boolean>>({});
+    const [isIngestingCandidates, setIsIngestingCandidates] = useState(false);
+    const [ingestionProgress, setIngestionProgress] = useState<string>('');
+    const [ingestionResults, setIngestionResults] = useState<Record<string, { success: boolean; message: string }>>({});
+    // --- End Discovery State ---
+
+    // --- Helper Function to parse combined name/version string ---
+    const parseNameVersion = (value: string): { name: string | null, version: string | null } => {
+        if (!value) return { name: null, version: null };
+        const separatorIndex = value.lastIndexOf('_v');
+        if (separatorIndex === -1) {
+            console.error(`Invalid recipe/algorithm value format: ${value}. Expected 'name_vVersion'.`);
+            return { name: null, version: null };
+        }
+        const name = value.substring(0, separatorIndex);
+        const version = value.substring(separatorIndex + 1);
+        return { name, version };
+    };
+
+    // --- Helper Functions for Dynamic List Inputs ---
+    const handleUpdateListItem = (
+        setter: React.Dispatch<React.SetStateAction<FormParams>>,
+        paramName: string,
+        index: number,
+        newValue: string
+    ) => {
+        setter(prevParams => {
+            const currentList = Array.isArray(prevParams[paramName]) ? [...prevParams[paramName]] : [];
+            if (index >= 0 && index < currentList.length) {
+                currentList[index] = newValue;
+            }
+            return { ...prevParams, [paramName]: currentList };
+        });
+    };
+
+    const handleAddListItem = (
+        setter: React.Dispatch<React.SetStateAction<FormParams>>,
+        paramName: string
+    ) => {
+        setter(prevParams => {
+            const currentList = Array.isArray(prevParams[paramName]) ? [...prevParams[paramName]] : [];
+            const newList = [...currentList, ''];
+            return { ...prevParams, [paramName]: newList };
+        });
+    };
+
+    const handleRemoveListItem = (
+        setter: React.Dispatch<React.SetStateAction<FormParams>>,
+        paramName: string,
+        index: number
+    ) => {
+        setter(prevParams => {
+            const currentList = Array.isArray(prevParams[paramName]) ? [...prevParams[paramName]] : [];
+            let newList = currentList.filter((_, i) => i !== index);
+            if (newList.length === 0) {
+                newList = ['']; // Ensure at least one input remains if all are removed
+            }
+            return { ...prevParams, [paramName]: newList };
+        });
+    };
+
+    const handleSimpleParamChange = (
+        setter: React.Dispatch<React.SetStateAction<FormParams>>,
+        e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    ) => {
+        const { name, value, type } = e.target;
+        const newValue = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
+        setter(prev => ({ ...prev, [name]: newValue }));
+    };
+    // --- End Dynamic List Helpers ---
+
+
+    // --- Parameter Preparation Helper (Used before execution) ---
+    const prepareParamsForExecution = (
+        metadataParams: RecipeParameterMetadataResponse[] | undefined,
+        currentParams: FormParams,
+        exclude: string[] = [],
+        extraParams: FormParams = {} // For things like repository_ids
+    ): { paramsToSend: FormParams; error: string | null } => {
+
+        const paramsToSend: FormParams = { ...extraParams };
+        let errorMessage: string | null = null;
+        const requiredParamsList: string[] = [];
+        let missingRequired = false;
+
+        if (!metadataParams) {
+            return { paramsToSend, error: null }; // No parameters defined
+        }
+
+        metadataParams.forEach(param => {
+            if (exclude.includes(param.name)) return; // Skip excluded params
+
+            const isOptional = param.type.startsWith('Optional[') || param.type.includes(' | None') || param.type.includes('Optional');
+            const value = currentParams[param.name];
+            const isStringListType = (param.type.toLowerCase().includes('list[str]') || param.type.toLowerCase().includes('List[str]') || param.type.includes('[]')) && param.type.toLowerCase().includes('str');
+
+            if (isStringListType) {
+                const filteredList = Array.isArray(value) ? value.filter(item => String(item).trim() !== '') : [];
+                if (!isOptional && filteredList.length === 0) {
+                    missingRequired = true;
+                    requiredParamsList.push(`${param.name} (at least one item required)`);
+                }
+                paramsToSend[param.name] = filteredList;
+            } else {
+                const stringValue = String(value ?? '').trim();
+                if (!isOptional && stringValue === '') {
+                    missingRequired = true;
+                    requiredParamsList.push(param.name);
+                } else if (stringValue !== '') {
+                    let parsedValue: any = value; // Default to original value
+                    let parseError = false;
+
+                    if (param.type === 'int' || param.type === 'Optional[int]') {
+                        const numValue = parseInt(stringValue, 10);
+                        if (isNaN(numValue)) {
+                            parseError = true; requiredParamsList.push(`${param.name} (must be a valid integer)`);
+                        } else { parsedValue = numValue; }
+                    } else if (param.type === 'float' || param.type === 'Optional[float]') {
+                        const floatValue = parseFloat(stringValue);
+                        if (isNaN(floatValue)) {
+                            parseError = true; requiredParamsList.push(`${param.name} (must be a valid number)`);
+                        } else { parsedValue = floatValue; }
+                    } else if (param.type === 'bool' || param.type === 'Optional[bool]') {
+                        if (stringValue.toLowerCase() === 'true') parsedValue = true;
+                        else if (stringValue.toLowerCase() === 'false') parsedValue = false;
+                        else { parseError = true; requiredParamsList.push(`${param.name} (must be 'true' or 'false')`); }
+                    }
+                    // Add other type coercions if needed
+
+                    if (parseError && !isOptional) {
+                        missingRequired = true;
+                    }
+                    paramsToSend[param.name] = parsedValue;
+                } else {
+                    // Value is empty or nullish
+                    if (!isOptional) {
+                        missingRequired = true;
+                        requiredParamsList.push(param.name);
+                    } else {
+                         paramsToSend[param.name] = null; // Send null for empty optional fields
+                    }
+                }
+            }
+        });
+
+        if (missingRequired) {
+            errorMessage = `Please fill in all required parameters correctly: ${requiredParamsList.join(', ')}`;
+        }
+
+        return { paramsToSend, error: errorMessage };
+    };
+
+
+    // --- Render Parameter Inputs Helper (REVISED for Dynamic Lists) ---
+    const renderParameterInputs = (
+        params: RecipeParameterMetadataResponse[] | undefined,
+        values: FormParams,
+        paramSetter: React.Dispatch<React.SetStateAction<FormParams>>,
+        idPrefix: string,
+        exclude: string[] = ['db_conn_str']
+    ) => {
+        if (!params) return null;
+        const userParams = params.filter(p => !exclude.includes(p.name));
+        if (userParams.length === 0) {
+            return <p>This recipe/algorithm requires no user-provided parameters.</p>;
+        }
+
+        return userParams.map((param) => {
+            const isOptional = param.type.startsWith('Optional[') || param.type.includes(' | None') || param.type.includes('Optional');
+            const isStringListType = (param.type.toLowerCase().includes('list[str]') || param.type.toLowerCase().includes('List[str]') || param.type.includes('[]')) && param.type.toLowerCase().includes('str');
+            const inputIdBase = `${idPrefix}_param_${param.name}`;
+
+            // Render Dynamic List Input
+            if (isStringListType) {
+                const currentList: string[] = Array.isArray(values[param.name]) && values[param.name].length > 0
+                    ? values[param.name]
+                    : [''];
+
+                return (
+                    <div key={param.name} className="form-group parameter-input-group list-parameter-group">
+                        <label>
+                            {param.name} (<code>{param.type}</code>){!isOptional && <span className="required-indicator">*</span>} : <br/>
+                            <small>{param.description}</small>
+                        </label>
+                        <div className="list-items-container">
+                            {currentList.map((item, index) => (
+                                <div key={index} className="list-item-input">
+                                    <input
+                                        type="text"
+                                        id={`${inputIdBase}_${index}`}
+                                        value={item}
+                                        onChange={(e) => handleUpdateListItem(paramSetter, param.name, index, e.target.value)}
+                                        placeholder={`Item ${index + 1}`}
+                                        className="list-item-text-input"
+                                        aria-label={`${param.name} item ${index + 1}`}
+                                    />
+                                    {currentList.length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveListItem(paramSetter, param.name, index)}
+                                            className="remove-item-button small-button"
+                                            aria-label={`Remove ${param.name} item ${index + 1}`}
+                                            title={`Remove item ${index + 1}`}
+                                        >
+                                            ×
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => handleAddListItem(paramSetter, param.name)}
+                            className="add-item-button small-button"
+                        >
+                            + Add Item
+                        </button>
+                        {!isOptional && currentList.every(item => String(item).trim() === '') && (
+                            <p className="error-message small-text">At least one non-empty item is required for {param.name}.</p>
+                        )}
+                    </div>
+                );
+            }
+            // Render Standard Input (Non-List)
+            else {
+                 let inputType: React.HTMLInputTypeAttribute = 'text';
+                 let step: string | undefined = undefined;
+                 if (param.type.includes('int')) { inputType = 'number'; step = '1'; }
+                 else if (param.type.includes('float')) { inputType = 'number'; step = 'any'; }
+                 else if (param.type.includes('bool')) { inputType = 'text'; } // Keep as text expecting 'true'/'false'
+
+                const placeholder = param.description || '';
+
+                return (
+                    <div key={param.name} className="form-group parameter-input-group">
+                        <label htmlFor={inputIdBase}>
+                            {param.name} (<code>{param.type}</code>){!isOptional && <span className="required-indicator">*</span>} :
+                        </label>
+                        <input
+                            type={inputType}
+                            id={inputIdBase}
+                            name={param.name}
+                            value={values[param.name] ?? ''}
+                            onChange={(e) => handleSimpleParamChange(paramSetter, e)}
+                            placeholder={placeholder}
+                            required={!isOptional}
+                            step={step}
+                        />
+                         {inputType === 'number' && step === 'any' && <small className="help-text"> Use decimal point (.) for fractions.</small>}
+                         {param.type.includes('bool') && inputType === 'text' && <small className="help-text"> Enter 'true' or 'false'.</small>}
+                    </div>
+                );
+            }
+        });
+    };
+
+    // --- Fetch Initial Data (Analysis Recipes) ---
+    useEffect(() => {
+        const fetchRecipes = async () => {
+            setIsAnalysisLoading(true); setAnalysisError(null);
+            try {
+                const fetchedAnalysisRecipes = await getAnalysisRecipes();
+                setAnalysisRecipes(fetchedAnalysisRecipes);
+            } catch (err) { setAnalysisError(err instanceof Error ? err.message : "Failed to load analysis recipes"); }
+            finally { setIsAnalysisLoading(false); }
+        };
+        fetchRecipes();
+    }, []);
+
+    // --- Fetch Affiliation Algorithms ---
+     const fetchAffilAlgos = useCallback(async () => {
+        setIsAffiliationLoading(true); setAffiliationError(null); setAffiliationAlgorithms([]);
+        try {
+            const algos = await getAffiliationAlgorithms();
+            setAffiliationAlgorithms(algos);
+        } catch (err) { setAffiliationError(err instanceof Error ? err.message : "Failed to load affiliation algorithms"); }
+        finally { setIsAffiliationLoading(false); }
+     }, []);
+
+    // --- Fetch Discovery Algorithms ---
+    const fetchDiscAlgos = useCallback(async () => {
+        setIsDiscoveryAlgosLoading(true); setDiscoveryAlgosError(null); setDiscoveryAlgorithms([]);
+        try {
+            const algos = await getDiscoveryAlgorithms();
+            setDiscoveryAlgorithms(algos);
+        } catch (err) { setDiscoveryAlgosError(err instanceof Error ? err.message : "Failed to load discovery algorithms"); }
+        finally { setIsDiscoveryAlgosLoading(false); }
+    }, []);
+
+    // Trigger fetching based on workflow stage
+    useEffect(() => {
+        if (workflowStage === 'affiliation_setup') {
+            fetchAffilAlgos();
+            fetchDiscAlgos();
+        } else {
+            setAffiliationAlgorithms([]);
+            setDiscoveryAlgorithms([]);
+             setSelectedAffiliationAlgorithm(null); setAffiliationParams({});
+             setSelectedDiscoveryAlgorithm(null); setDiscoveryParams({});
+             setShowDiscoverySection(false);
+        }
+    }, [workflowStage, fetchAffilAlgos, fetchDiscAlgos]);
+
+    // --- Fetch Institution Search Results ---
+    useEffect(() => {
+        const handler = setTimeout(async () => {
+            if (workflowStage === 'affiliation_setup' && institutionQuery.length > 1 && !selectedInstitution) {
+                try {
+                    const results = await searchInstitutions(institutionQuery, 0, 10);
+                    setInstitutionSearchResults(results);
+                } catch (err) { console.error("Institution search failed:", err); setInstitutionSearchResults([]); }
+            } else { setInstitutionSearchResults([]); }
+        }, 500);
+        return () => clearTimeout(handler);
+    }, [institutionQuery, selectedInstitution, workflowStage]);
+
+    // --- Fetch Affiliation Results & Context ---
+    const fetchAffiliationResults = useCallback(async (instId: number) => {
+        setIsAffiliationResultsLoading(true); setAffiliationResultsError(null); setAffiliationResults([]);
+        try {
+            const results = await getInstitutionAffiliationResults(instId);
+            setAffiliationResults(results);
+        } catch (err) { setAffiliationResultsError(err instanceof Error ? err.message : "Failed to load affiliation results"); }
+        finally { setIsAffiliationResultsLoading(false); }
+    }, []);
+
+    const fetchContext = useCallback(async (instName: string) => {
+         setIsIngestionContextLoading(true); setIngestionContextError(null); setIngestionContext(null);
+         try {
+             const contextData = await getIngestionHistoryContext('keyword', instName);
+             setIngestionContext(contextData);
+         } catch (err) { setIngestionContextError(err instanceof Error ? err.message : "Failed to load ingestion context"); }
+         finally { setIsIngestionContextLoading(false); }
+    }, []);
+
+// --- UPDATED useEffect hook (with logging) ---
+    // Fetch data when institution is selected OR workflow stage changes relevantly
+    useEffect(() => {
+        // --- Add Log Start ---
+        //console.log(`[useEffect selectedInstitution/workflowStage] Running. Stage: ${workflowStage}, Institution Selected: ${!!selectedInstitution}`);
+        // --- End Log Start ---
+
+        if (workflowStage === 'affiliation_setup' && selectedInstitution) {
+            // Condition 1: We are in affiliation setup AND an institution is selected
+            //console.log(`[useEffect selectedInstitution/workflowStage] Condition MET (Affiliation Setup + Institution). Fetching results/context for Inst ID: ${selectedInstitution.id}`);
+            fetchAffiliationResults(selectedInstitution.id);
+            if(selectedInstitution.display_name) {
+                fetchContext(selectedInstitution.display_name);
+            } else {
+                //console.warn("[useEffect selectedInstitution/workflowStage] Selected institution has no display name, cannot fetch context.");
+                setIngestionContext(null);
+                setIngestionContextError("Cannot fetch context: Institution name missing.");
+            }
+            // IMPORTANT: Do NOT reset selectedRepositoryIds here when fetching data for affiliation setup
+        } else {
+             // Condition 2: We are NOT in affiliation setup OR no institution is selected
+             // This block runs when switching TO 'initial' or 'analysis_selection', or when deselecting an institution.
+            //console.log(`[useEffect selectedInstitution/workflowStage] Condition NOT MET (Stage: ${workflowStage}, Inst Selected: ${!!selectedInstitution}). Running ELSE block to reset state.`);
+
+            // Reset states relevant to the affiliation/discovery process that should clear
+            // when leaving the setup stage or deselecting the institution.
+            setAffiliationResults([]);
+            setIngestionContext(null);
+            setAffiliationResultsError(null);
+            setIngestionContextError(null);
+            setShowDiscoverySection(false);
+            setCandidateUrls(null);
+            setSelectedUrlsToIngest({});
+            setDiscoveryParams({});
+            setSelectedDiscoveryAlgorithm(null);
+            setIngestionProgress('');
+            setIngestionResults({});
+
+            // --- CONDITIONAL Reset for selectedRepositoryIds ---
+            // Only reset repository IDs if we are *leaving* the analysis selection stage,
+            // or if the institution is deselected while in affiliation setup.
+            // DO NOT reset it just because the stage changed *to* analysis_selection.
+            if (workflowStage !== 'analysis_selection') {
+                 //console.log(`[useEffect selectedInstitution/workflowStage] ELSE block: Resetting selectedRepositoryIds because workflowStage is NOT 'analysis_selection' (it is ${workflowStage}). Current count: ${selectedRepositoryIds.length}`);
+                 setSelectedRepositoryIds([]);
+            } else {
+                 //console.log(`[useEffect selectedInstitution/workflowStage] ELSE block: SKIPPING reset of selectedRepositoryIds because workflowStage IS 'analysis_selection'. Current count: ${selectedRepositoryIds.length}`);
+            }
+            // --- End CONDITIONAL Reset ---
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedInstitution, workflowStage, fetchAffiliationResults, fetchContext]); // Keep original dependencies
+
+    // --- Filtered Affiliation Results ---
+    const filteredAffiliationResults = useMemo(() => {
+        return affiliationResults.filter(aff => aff.confidence_score >= confidenceThreshold);
+    }, [affiliationResults, confidenceThreshold]);
+
+    // --- Initialize Parameters Helper (REVISED - No 'default' property) ---
+    const initializeParams = (parameters: RecipeParameterMetadataResponse[] | undefined): FormParams => {
+        const initialParams: FormParams = {};
+        parameters?.forEach(param => {
+            const isStringListType = (param.type.toLowerCase().includes('list[str]') || param.type.toLowerCase().includes('List[str]') || param.type.includes('[]')) && param.type.toLowerCase().includes('str');
+            if (isStringListType) {
+                initialParams[param.name] = ['']; // Default for lists is one empty input
+            } else {
+                // Initialize all non-list params to empty string by default
+                initialParams[param.name] = '';
+            }
+        });
+        return initialParams;
+    };
+
+    // --- Handlers ---
+
+    // --- Selection Handlers (UPDATED to initialize params) ---
+    const handleAnalysisRecipeChange = (name: string, version: string) => {
+        const recipe = analysisRecipes.find(r => r.name === name && r.version === version);
+        setSelectedAnalysisRecipe(recipe || null);
+        setAnalysisParams(initializeParams(recipe?.parameters));
+        setAnalysisExecutionResult(null); setAnalysisExecutionError(null);
+    };
+
+    const handleAffiliationAlgorithmChange = (name: string, version: string) => {
+        const algo = affiliationAlgorithms.find(a => a.name === name && a.version === version);
+        setSelectedAffiliationAlgorithm(algo || null);
+        setAffiliationParams(initializeParams(algo?.parameters));
+        setAffiliationExecutionResult(null); setAffiliationExecutionError(null);
+    };
+
+    const handleSelectedDiscoveryAlgorithmChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+        const selectedValue = event.target.value;
+        setCandidateUrls(null); setSelectedUrlsToIngest({}); setDiscoveryError(null);
+
+        if (!selectedValue) {
+            setSelectedDiscoveryAlgorithm(null);
+            setDiscoveryParams({});
+            return;
+        }
+        const { name, version } = parseNameVersion(selectedValue);
+        if (name && version) {
+            const algo = discoveryAlgorithms.find(a => a.name === name && a.version === version);
+            setSelectedDiscoveryAlgorithm(algo || null);
+            setDiscoveryParams(initializeParams(algo?.parameters));
+        }
+    };
+    // --- End Selection Handlers ---
+
+    // --- Execution Handlers (UPDATED to use prepareParamsForExecution) ---
+    const handleExecuteAnalysisRecipe = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (!selectedAnalysisRecipe) return;
+
+        setIsAnalysisExecuting(true);
+        setAnalysisExecutionError(null);
+        setAnalysisExecutionResult(null);
+
+        const excludeParams = ['db_conn_str'];
+        const extraParams: FormParams = {};
+        const expectsMultipleRepos = selectedAnalysisRecipe.parameters.some(p => p.name === 'repository_ids');
+
+        if (workflowStage === 'analysis_selection' && expectsMultipleRepos && selectedRepositoryIds.length > 0) {
+            excludeParams.push('repository_ids', 'repository_id');
+            extraParams['repository_ids'] = selectedRepositoryIds;
+        }
+
+        const { paramsToSend, error: prepError } = prepareParamsForExecution(
+            selectedAnalysisRecipe.parameters,
+            analysisParams,
+            excludeParams,
+            extraParams
+        );
+
+        if (prepError) {
+            setAnalysisExecutionError(prepError);
+            setIsAnalysisExecuting(false);
+            return;
+        }
+
+        try {
+            //console.log("Executing analysis recipe with params:", paramsToSend);
+            const result = await executeAnalysisRecipe(selectedAnalysisRecipe.name, selectedAnalysisRecipe.version, paramsToSend);
+            //console.log("Received analysis result:", result);
+            setAnalysisExecutionResult(result);
+            if (!result.success) {
+                setAnalysisExecutionError(result.error?.message ?? "Recipe execution failed with no details.");
+            }
+        } catch (err) {
+            setAnalysisExecutionError(err instanceof Error ? err.message : "An unexpected error occurred during execution.");
+        } finally {
+            setIsAnalysisExecuting(false);
+        }
+    };
+
+    const handleExecuteAffiliationAlgorithm = async (e: FormEvent) => {
+        e.preventDefault();
+        if (!selectedAffiliationAlgorithm || !selectedInstitution) return;
+
+        setIsAffiliationExecuting(true);
+        setAffiliationExecutionError(null);
+        setAffiliationExecutionResult(null);
+
+        const { paramsToSend, error: prepError } = prepareParamsForExecution(
+            selectedAffiliationAlgorithm.parameters,
+            affiliationParams,
+            ['institution_id', 'db_conn_str']
+        );
+
+        if (prepError) {
+            setAffiliationExecutionError(prepError);
+            setIsAffiliationExecuting(false);
+            return;
+        }
+
+        try {
+            //console.log("Executing affiliation algorithm with params:", paramsToSend);
+            const result = await executeAffiliationAlgorithm(
+                selectedAffiliationAlgorithm.name,
+                selectedAffiliationAlgorithm.version,
+                selectedInstitution.id,
+                paramsToSend
+            );
+            setAffiliationExecutionResult(result);
+            if (result.status !== 'COMPLETED') {
+                setAffiliationExecutionError(result.message ?? "Affiliation algorithm execution did not complete successfully.");
+            } else {
+                fetchAffiliationResults(selectedInstitution.id);
+            }
+        } catch (err) {
+            setAffiliationExecutionError(err instanceof Error ? err.message : "An unexpected client error occurred during affiliation execution.");
+        } finally {
+            setIsAffiliationExecuting(false);
+        }
+    };
+
+     const handleExecuteDiscovery = async () => {
+        if (!selectedDiscoveryAlgorithm) {
+            setDiscoveryError("Please select a discovery algorithm.");
+            return;
+        }
+        setIsDiscovering(true);
+        setDiscoveryError(null);
+        setCandidateUrls(null);
+        setSelectedUrlsToIngest({});
+        setIngestionProgress('');
+        setIngestionResults({});
+
+        const { paramsToSend, error: prepError } = prepareParamsForExecution(
+            selectedDiscoveryAlgorithm.parameters,
+            discoveryParams,
+            ['db_conn_str', 'github_api_token']
+        );
+
+        if (prepError) {
+            setDiscoveryError(prepError);
+            setIsDiscovering(false);
+            return;
+        }
+
+        try {
+            const requestBody: DiscoveryExecutionRequest = { parameters: paramsToSend };
+            //console.log("Executing discovery algorithm with params:", requestBody);
+            const urls = await executeDiscoveryAlgorithm(
+                selectedDiscoveryAlgorithm.name,
+                selectedDiscoveryAlgorithm.version,
+                requestBody
+            );
+            setCandidateUrls(urls);
+            setSelectedUrlsToIngest(urls.reduce((acc, url) => ({ ...acc, [url]: true }), {}));
+
+        } catch (error: any) {
+            console.error("Discovery execution failed:", error);
+            setDiscoveryError(`Failed to execute discovery algorithm: ${error.message || 'Unknown error'}`);
+            setCandidateUrls([]);
+        } finally {
+            setIsDiscovering(false);
+        }
+    };
+    // --- End Execution Handlers ---
+
+    // --- Other Handlers ---
+    const handleWorkflowModeChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const checked = event.target.checked;
+        const newStage = checked ? 'affiliation_setup' : 'initial';
+        setWorkflowStage(newStage);
+        setSelectedAnalysisRecipe(null); setAnalysisParams({}); setAnalysisExecutionResult(null); setAnalysisExecutionError(null);
+        setSelectedInstitution(null); setInstitutionQuery(''); setInstitutionSearchResults([]);
+        setSelectedAffiliationAlgorithm(null); setAffiliationParams({}); setAffiliationResults([]); setAffiliationExecutionResult(null); setAffiliationExecutionError(null);
+        setIngestionContext(null); setSelectedRepositoryIds([]);
+        setShowDiscoverySection(false); setCandidateUrls(null); setSelectedUrlsToIngest({});
+        setSelectedDiscoveryAlgorithm(null); setDiscoveryParams({}); setDiscoveryError(null);
+        setIngestionProgress(''); setIngestionResults({});
+    };
+
+    const handleSelectInstitution = (institution: InstitutionSummary) => {
+        setSelectedInstitution(institution);
+        setInstitutionQuery(institution.display_name ?? '');
+        setInstitutionSearchResults([]);
+        setAffiliationResults([]); setAffiliationExecutionResult(null); setAffiliationExecutionError(null);
+        setIngestionContext(null); setSelectedRepositoryIds([]); setAffiliationParams({}); setSelectedAffiliationAlgorithm(null);
+        setShowDiscoverySection(false); setCandidateUrls(null); setSelectedUrlsToIngest({});
+        setDiscoveryParams({}); setSelectedDiscoveryAlgorithm(null);
+        setIngestionProgress(''); setIngestionResults({});
+    };
+
+    // --- UPDATED handleProceedToAnalysis ---
+    const handleProceedToAnalysis = () => {
+        //console.log("[handleProceedToAnalysis] START");
+        //console.log("  - Current confidenceThreshold:", confidenceThreshold);
+        //console.log("  - Current affiliationResults count:", affiliationResults.length);
+        //console.log("  - Reading filteredAffiliationResults from useMemo:", filteredAffiliationResults.length); // Log the memoized value
+
+        // --- Perform filtering *directly* here to ensure latest threshold is used ---
+        const directlyFilteredResults = affiliationResults.filter(aff => aff.confidence_score >= confidenceThreshold);
+        //console.log("  - Directly filtered results count:", directlyFilteredResults.length);
+        // --- End direct filtering ---
+
+        // Use the directly filtered results to get repo IDs
+        const repoIds = directlyFilteredResults.map(aff => aff.repository_id);
+        //console.log("  - Calculated repoIds count (from direct filter):", repoIds.length);
+        //console.log("  - Calculated repoIds (first 10):", repoIds.slice(0, 10));
+
+        if (repoIds.length === 0) {
+            console.warn("[handleProceedToAnalysis] Proceeding with 0 Repository IDs based on direct filter.");
+        }
+
+        //console.log("[handleProceedToAnalysis] Calling setSelectedRepositoryIds with count:", repoIds.length);
+        setSelectedRepositoryIds(repoIds);
+
+        //console.log("[handleProceedToAnalysis] Calling setWorkflowStage('analysis_selection')");
+        setWorkflowStage('analysis_selection');
+
+        //console.log("[handleProceedToAnalysis] END");
+    };
+
+    const handleCandidateSelectionChange = (url: string, isSelected: boolean) => {
+      setSelectedUrlsToIngest(prev => ({ ...prev, [url]: isSelected }));
+    };
+
+    const handleIngestSelectedCandidates = async () => {
+        const urlsToIngest = Object.entries(selectedUrlsToIngest)
+            .filter(([_, isSelected]) => isSelected)
+            .map(([url]) => url);
+
+        if (urlsToIngest.length === 0) {
+            setIngestionProgress("No URLs selected for ingestion.");
+            return;
+        }
+
+        setIsIngestingCandidates(true);
+        setIngestionProgress(`Starting ingestion trigger for ${urlsToIngest.length} URLs...`);
+        setIngestionResults({});
+
+        let successCount = 0;
+        const totalCount = urlsToIngest.length;
+        const results: Record<string, { success: boolean; message: string }> = {};
+
+        for (let i = 0; i < totalCount; i++) {
+            const url = urlsToIngest[i];
+            setIngestionProgress(`Triggering ${i + 1}/${totalCount}: ${url}`);
+            try {
+                await triggerUrlIngestion(url);
+                results[url] = { success: true, message: "Triggered" };
+                successCount++;
+                 await new Promise(resolve => setTimeout(resolve, 100));
+            } catch (error: any) {
+                console.error(`Error triggering ingestion for ${url}:`, error);
+                results[url] = { success: false, message: `Error: ${error.message || 'Trigger failed'}` };
+            }
+        }
+
+        setIngestionResults(results);
+        setIngestionProgress(`Ingestion trigger process finished. Successfully triggered: ${successCount}/${totalCount}. Monitor system status or discovery chains for actual completion.`);
+        setIsIngestingCandidates(false);
+        setSelectedUrlsToIngest(urlsToIngest.reduce((acc, url) => ({ ...acc, [url]: false }), {}));
+    };
+    // --- End Other Handlers ---
+
+
+    // --- Result Rendering ---
+    // --- MODIFIED renderAnalysisResults ---
+    const renderAnalysisResults = () => {
+        const loadingProps: LoadingSpinnerProps = { message: "Executing analysis recipe..." };
+        const errorProps = (msg: string): ErrorMessageProps => ({ message: msg });
+
+        if (isAnalysisExecuting) return <LoadingSpinner {...loadingProps} />;
+        if (analysisExecutionError && !analysisExecutionResult) return <ErrorMessage {...errorProps(analysisExecutionError)} />;
+        if (!analysisExecutionResult) return null;
+
+         if (!analysisExecutionResult.success) {
+             return <ErrorMessage message={analysisExecutionResult.error?.message ?? "Recipe execution failed with no details."} />;
+         }
+         if (!analysisExecutionResult.data) {
+              return <ErrorMessage message="Recipe executed successfully but returned no data." />;
+         }
+
+        // Type guard for nested result structure
+        const isNestedResultData = (data: any): data is NestedResultData => {
+             return typeof data === 'object' && data !== null;
+        };
+
+        const nestedResult = isNestedResultData(analysisExecutionResult.data) ? analysisExecutionResult.data : null;
+
+        if (!nestedResult) {
+             console.error("Render Analysis Results: analysisExecutionResult.data is not an object", analysisExecutionResult.data);
+             return (
+                 <div className="results-container results-area">
+                     <h4>Analysis Results</h4>
+                     <ErrorMessage message="Unexpected result format received from server." />
+                     <p>Raw Data:</p>
+                     <pre><code>{JSON.stringify(analysisExecutionResult.data, null, 2)}</code></pre>
+                 </div>
+             );
+        }
+
+        const { result_type: currentResultType, data: actualData, notes } = nestedResult;
+        const displayResultType = currentResultType ?? 'N/A';
+
+        // --- Dynamically create columns prop for SimpleTable ---
+        let tableColumns: TableColumn[] | null = null; // <-- Use TableColumn type
+        const isTableType = currentResultType === 'table';
+
+        if (isTableType) {
+            if (Array.isArray(actualData) && actualData.length > 0 && typeof actualData[0] === 'object' && actualData[0] !== null) {
+                try {
+                    // Generate columns from the keys of the first data row
+                    tableColumns = Object.keys(actualData[0]).map(key => ({
+                        key: key, // Use the object key
+                        header: key // Use the key as the header text (can be enhanced later)
+                    }));
+                } catch (e) { console.error("Render Analysis Results: Error preparing table columns:", e); }
+            } else if (Array.isArray(actualData) && actualData.length === 0){
+                 //console.log("Render Analysis Results: Recipe returned an empty table.");
+             } else {
+                 console.warn("Render Analysis Results: Table data received, but it's not a non-empty array of objects:", actualData);
+             }
+        }
+        // --- End column generation ---
+
+
+        return (
+            <div className="results-container results-area">
+                <h4>Analysis Results</h4>
+                {notes && (
+                    <div className="result-notes">
+                        <strong>Notes from Recipe:</strong>
+                        {Array.isArray(notes) ? (
+                            <ul>{notes.map((note, idx) => <li key={idx}>{note}</li>)}</ul>
+                        ) : (
+                            <p>{notes}</p>
+                        )}
+                    </div>
+                 )}
+
+                <p><strong>Result Type:</strong> {displayResultType}</p>
+
+                {currentResultType === 'value' && ( <div className="result-value"><pre><code>{JSON.stringify(actualData, null, 2)}</code></pre></div> )}
+                {/* --- Pass generated columns and actualData to SimpleTable --- */}
+                {isTableType && tableColumns && actualData && ( <SimpleTable columns={tableColumns} data={actualData} /> )}
+                {/* --- End SimpleTable invocation update --- */}
+                {isTableType && !tableColumns && Array.isArray(actualData) && actualData.length === 0 && ( <p>Recipe returned an empty table (0 rows).</p> )}
+                {isTableType && !tableColumns && (!Array.isArray(actualData) || actualData.length > 0) && ( <p>Recipe returned table format, but no valid data was found or data could not be processed for table display.</p> )}
+                {currentResultType !== 'table' && currentResultType !== 'value' && ( <div className="result-unknown"> <p>Unknown or unhandled result type encountered ('{currentResultType}'). Displaying raw data:</p> <pre><code>{JSON.stringify(actualData ?? 'No data available', null, 2)}</code></pre> </div> )}
+            </div>
+        );
+    };
+    // --- End Modified renderAnalysisResults ---
+
+    // Affiliation Results Table Renderer (MODIFIED to use 'columns')
+    const renderAffiliationResultsTable = () => {
+        const loadingProps: LoadingSpinnerProps = {};
+        const errorProps = (msg: string): ErrorMessageProps => ({ message: msg });
+        if (isAffiliationResultsLoading) return <LoadingSpinner {...loadingProps} />;
+        if (affiliationResultsError) return <ErrorMessage {...errorProps(affiliationResultsError)} />;
+        if (!selectedInstitution) return <p className="help-text">Select an institution to view results.</p>;
+
+        const displayResults = filteredAffiliationResults;
+
+        if (displayResults.length === 0 && affiliationResults.length > 0) {
+            return <p>No stored affiliation results meet the current confidence threshold ({confidenceThreshold.toFixed(2)}).</p>;
+        } else if (affiliationResults.length === 0) {
+             return <p>No stored affiliation results found for this institution. You may need to run an affiliation algorithm.</p>;
+        }
+
+        // Define columns explicitly
+        const affilColumns: TableColumn[] = [ // <-- Use TableColumn type
+            { key: 'repository_id', header: 'Repo ID' },
+            { key: 'repository_name', header: 'Repository Name' },
+            { key: 'confidence_score', header: 'Confidence' },
+            { key: 'algorithm_name', header: 'Algorithm' },
+            { key: 'algorithm_version', header: 'Version' },
+            { key: 'calculated_at', header: 'Calculated' },
+        ];
+
+        const tableData = displayResults.map(aff => ({
+             repository_id: aff.repository_id,
+             repository_name: aff.repository_name ?? 'N/A',
+             confidence_score: aff.confidence_score.toFixed(3),
+             algorithm_name: aff.algorithm_name,
+             algorithm_version: aff.algorithm_version,
+             calculated_at: new Date(aff.calculated_at).toLocaleDateString(),
+         }));
+
+        return <SimpleTable columns={affilColumns} data={tableData} />;
+    };
+
+    // --- RENDER FUNCTION for Discovery Section ---
+    const renderDiscoverySection = () => {
+      if (!showDiscoverySection) return null;
+
+      return (
+        <div className="discovery-section workflow-section subsection-box">
+          <h4>Discover More Repositories</h4>
+           {isDiscoveryAlgosLoading && <LoadingSpinner message="Loading discovery algorithms..." />}
+           {discoveryAlgosError && <ErrorMessage message={discoveryAlgosError} />}
+           {!isDiscoveryAlgosLoading && !discoveryAlgosError && discoveryAlgorithms.length === 0 && <p>No discovery algorithms available.</p>}
+           {!isDiscoveryAlgosLoading && !discoveryAlgosError && discoveryAlgorithms.length > 0 && (
+               <>
+                  <div className="form-group">
+                    <label htmlFor="discovery-algorithm-select">Discovery Algorithm:</label>
+                    <select
+                      id="discovery-algorithm-select"
+                      value={selectedDiscoveryAlgorithm ? `${selectedDiscoveryAlgorithm.name}_${selectedDiscoveryAlgorithm.version}` : ""}
+                      onChange={handleSelectedDiscoveryAlgorithmChange}
+                      disabled={isDiscovering || isIngestingCandidates}
+                    >
+                      <option value="">-- Select Algorithm --</option>
+                      {discoveryAlgorithms.map(algo => (
+                        <option key={`${algo.name}_${algo.version}`} value={`${algo.name}_${algo.version}`}>
+                          {algo.name} (v{algo.version}) - {algo.description}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {selectedDiscoveryAlgorithm && (
+                    <>
+                      <div className="parameter-form">
+                          {renderParameterInputs(
+                              selectedDiscoveryAlgorithm.parameters,
+                              discoveryParams,
+                              setDiscoveryParams, // Pass the correct setter
+                              "discovery",
+                              ['db_conn_str', 'github_api_token']
+                          )}
+                      </div>
+                      {discoveryError && <ErrorMessage message={`${discoveryError}`} />}
+                      <button onClick={handleExecuteDiscovery} disabled={isDiscovering || isIngestingCandidates || !selectedDiscoveryAlgorithm} className="action-button">
+                        {isDiscovering ? <LoadingSpinner /> : 'Find Candidate Repositories'}
+                      </button>
+                    </>
+                  )}
+
+                  {isDiscovering && <p><LoadingSpinner /> Searching for candidates...</p>}
+
+                  {candidateUrls !== null && !isDiscovering && (
+                     <div className="candidate-results">
+                         <h5>Candidate Repositories ({candidateUrls.length} found)</h5>
+                         {candidateUrls.length === 0 && !discoveryError && <p>No candidates found matching the criteria.</p>}
+                         {candidateUrls.length > 0 && (
+                            <>
+                                <div className="candidate-list">
+                                    {candidateUrls.map((url) => (
+                                        <div key={url} className="candidate-item">
+                                            <input
+                                                type="checkbox"
+                                                id={`candidate-${url.replace(/[^a-zA-Z0-9-_]/g, '')}`}
+                                                checked={!!selectedUrlsToIngest[url]}
+                                                onChange={(e) => handleCandidateSelectionChange(url, e.target.checked)}
+                                                disabled={isIngestingCandidates}
+                                            />
+                                            <label htmlFor={`candidate-${url.replace(/[^a-zA-Z0-9-_]/g, '')}`}>{url}</label>
+                                            {ingestionResults[url] && (
+                                                <span className={`ingestion-status ${ingestionResults[url].success ? 'success' : 'error'}`}>
+                                                    {ingestionResults[url].success ? ' Triggered.' : ` Error: ${ingestionResults[url].message}`}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                <p>Select repositories to trigger ingestion into MOSS.</p>
+                                <button onClick={handleIngestSelectedCandidates} disabled={isIngestingCandidates || Object.values(selectedUrlsToIngest).every(v => !v)} className="action-button">
+                                    {isIngestingCandidates ? <LoadingSpinner /> : `Trigger Ingestion for Selected (${Object.values(selectedUrlsToIngest).filter(v=>v).length})`}
+                                </button>
+                                {ingestionProgress && <p className="ingestion-progress">{ingestionProgress}</p>}
+                                <p className="guidance-text">
+                                    <strong>Guidance:</strong> After ingestion is triggered, monitor system status or discovery chains for completion.
+                                    You may need to re-run the affiliation algorithm above to include the newly ingested data before proceeding.
+                                </p>
+                            </>
+                         )}
+                     </div>
+                  )}
+               </>
+           )}
+        </div>
+      );
+    };
+    // --- End Discovery Render Function ---
+
+
+    // --- RENDER FUNCTIONS for workflow stages ---
+    const renderAffiliationSetup = () => (
+        <div className="affiliation-workflow-section">
+            <h3>Affiliation Analysis Workflow</h3>
+            {/* Step 1: Select Institution */}
+            <div className="workflow-step">
+                <h4>1. Select Institution</h4>
+                 <div className="form-group institution-selector">
+                    <label htmlFor="institutionQuery">Search & Select Institution:</label>
+                     <input type="text" id="institutionQuery" value={institutionQuery} onChange={(e) => { setInstitutionQuery(e.target.value); setSelectedInstitution(null); }} placeholder="Start typing institution name..." disabled={isAffiliationExecuting || isDiscovering || isIngestingCandidates}/>
+                     {selectedInstitution && (<span className="selected-institution-display"> Selected: {selectedInstitution.display_name} <button type="button" onClick={() => { setSelectedInstitution(null); setInstitutionQuery(''); }} className="clear-button small-button" disabled={isAffiliationExecuting || isDiscovering || isIngestingCandidates}>(Change)</button></span>)}
+                     {institutionSearchResults.length > 0 && !selectedInstitution && ( <ul className="search-results-dropdown"> {institutionSearchResults.map(inst => (<li key={inst.id} onClick={() => handleSelectInstitution(inst)}>{inst.display_name} {inst.ror && `(${inst.ror})`}</li>))} </ul> )}
+                 </div>
+            </div>
+
+            {selectedInstitution && (
+                <>
+                    {/* Step 2: Review & Calculate Affiliations */}
+                    <div className="workflow-step">
+                        <h4>2. Review & Calculate Affiliations for: <em>{selectedInstitution.display_name}</em></h4>
+                        <div className="context-hint">
+                            {isIngestionContextLoading && <LoadingSpinner message="Loading context..." />}
+                            {ingestionContextError && <ErrorMessage message={ingestionContextError} />}
+                            {ingestionContext && ( <p> <small> Context: Last relevant ingestion ({ingestionContext.ingestion_type || 'N/A'}) completed: {ingestionContext.last_ingested_at ? new Date(ingestionContext.last_ingested_at).toLocaleString() : 'Never'} </small> </p> )}
+                        </div>
+                        {/* Affiliation Results Display & Filtering */}
+                        <div className="results-display subsection-box">
+                            <h5>Stored Affiliation Results</h5>
+                             <div className="form-group confidence-threshold">
+                                <label htmlFor="confidenceThreshold">Minimum Confidence Threshold:</label>
+                                <input type="range" id="confidenceThreshold" min="0" max="1" step="0.05" value={confidenceThreshold} onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))} disabled={affiliationResults.length === 0 || isAffiliationResultsLoading || isDiscovering || isIngestingCandidates} /> <span>{confidenceThreshold.toFixed(2)}</span>
+                                <p><small> Showing {filteredAffiliationResults.length} of {affiliationResults.length} total stored results matching threshold. </small></p>
+                            </div>
+                            {renderAffiliationResultsTable()}
+                        </div>
+                         {/* Affiliation Algorithm Execution */}
+                        <div className="algorithm-execution subsection-box">
+                            <label htmlFor="affiliationAlgorithmSelect" className="block-label">Run/Refresh Affiliation Algorithm:</label>
+                            {isAffiliationLoading && <LoadingSpinner message="Loading algorithms..." />}
+                            {affiliationError && <ErrorMessage message={affiliationError} />}
+                            {!isAffiliationLoading && affiliationAlgorithms.length === 0 && <p>No affiliation algorithms available.</p>}
+                            {!isAffiliationLoading && affiliationAlgorithms.length > 0 && (
+                                <>
+                                    <select id="affiliationAlgorithmSelect" value={selectedAffiliationAlgorithm ? `${selectedAffiliationAlgorithm.name}_${selectedAffiliationAlgorithm.version}` : ""} onChange={(e) => { const { name, version } = parseNameVersion(e.target.value); if (name && version) { handleAffiliationAlgorithmChange(name, version); } else { setSelectedAffiliationAlgorithm(null); setAffiliationParams({});} }} disabled={isAffiliationExecuting || isDiscovering || isIngestingCandidates}>
+                                        <option value="">-- Select Algorithm --</option>
+                                        {affiliationAlgorithms.map(algo => ( <option key={`${algo.name}_${algo.version}`} value={`${algo.name}_${algo.version}`}> {algo.name} v{algo.version} - {algo.description} </option> ))}
+                                    </select>
+                                    {selectedAffiliationAlgorithm && (
+                                        <form onSubmit={handleExecuteAffiliationAlgorithm} className="parameter-form subsection-form">
+                                            <p>Parameters for {selectedAffiliationAlgorithm.name}:</p>
+                                            {renderParameterInputs(
+                                                selectedAffiliationAlgorithm.parameters,
+                                                affiliationParams,
+                                                setAffiliationParams, // Pass correct setter
+                                                "affil",
+                                                ['institution_id', 'db_conn_str']
+                                            )}
+                                            {affiliationExecutionError && <ErrorMessage message={affiliationExecutionError} />}
+                                            <button type="submit" disabled={isAffiliationExecuting || isDiscovering || isIngestingCandidates || !selectedAffiliationAlgorithm} className="action-button">
+                                                {isAffiliationExecuting ? <LoadingSpinner /> : `Run ${selectedAffiliationAlgorithm.name}`}
+                                            </button>
+                                            {affiliationExecutionResult && affiliationExecutionResult.status !== 'IDLE' && <p className={`execution-status ${affiliationExecutionResult.status !== 'COMPLETED' ? 'error' : 'success'}`}>{affiliationExecutionResult.message}</p>}
+                                        </form>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                         {/* Discovery Integration */}
+                         <div className="discovery-integration subsection-box">
+                             <button onClick={() => setShowDiscoverySection(prev => !prev)} className="discover-toggle-button" disabled={isAffiliationExecuting || isDiscovering || isIngestingCandidates}>
+                                {showDiscoverySection ? 'Hide Discovery Section' : 'Discover More Repositories...'}
+                             </button>
+                             {renderDiscoverySection()}
+                         </div>
+                    </div>
+
+                    {/* Step 3: Proceed to Analysis */}
+                    <div className="workflow-step">
+                        <h4>3. Proceed to Analysis</h4>
+                        <button onClick={handleProceedToAnalysis} disabled={!selectedInstitution || isAffiliationResultsLoading || filteredAffiliationResults.length === 0 || isAffiliationExecuting || isDiscovering || isIngestingCandidates} className="proceed-button">
+                             Proceed to Analysis Selection ({filteredAffiliationResults.length} Repositories)
+                        </button>
+                        <p><small>(This will pass repositories meeting the threshold in Step 2 to the analysis step)</small></p>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+
+    const renderAnalysisSelection = () => {
+        // --- Log state at the START of this render function ---
+        //console.log("[renderAnalysisSelection] Rendering...");
+        //console.log("  - Current workflowStage:", workflowStage);
+        //console.log("  - Current selectedRepositoryIds count:", selectedRepositoryIds.length);
+         // Limit logging actual IDs if the list is very long
+        //console.log("  - Current selectedRepositoryIds (first 10):", selectedRepositoryIds.slice(0, 10));
+        // --- End Logging ---
+
+        return (
+            <div className="analysis-workflow-section">
+                <h3>Analysis Recipe Selection</h3>
+                <p>Selected Institution: <strong>{selectedInstitution?.display_name ?? 'N/A'}</strong></p>
+                <p>Repositories to Analyze (Confidence ≥ {confidenceThreshold.toFixed(2)}): <strong>{selectedRepositoryIds.length}</strong></p>
+                <button type="button" onClick={() => setWorkflowStage('affiliation_setup')} className="back-button small-button">Back to Affiliation Setup</button>
+
+                {/* Conditional Rendering based on state during *this* render */}
+                {workflowStage === 'analysis_selection' && (
+                    <>
+                        {selectedRepositoryIds.length === 0 && (
+                             // This error message uses the value of selectedRepositoryIds from *this render pass*
+                            <ErrorMessage message="No repositories met the confidence threshold to proceed with analysis. Go back to adjust the threshold or run an affiliation algorithm." />
+                        )}
+
+                        {/* Loading states for recipes */}
+                        {isAnalysisLoading && <LoadingSpinner message="Loading recipes..." />}
+                        {analysisError && <ErrorMessage message={analysisError} />}
+
+                        {!isAnalysisLoading && !analysisError && analysisRecipes.length === 0 && selectedRepositoryIds.length > 0 && (
+                             <p>No analysis recipes found.</p>
+                        )}
+
+                        {!isAnalysisLoading && !analysisError && analysisRecipes.length > 0 && selectedRepositoryIds.length > 0 && (
+                            <form onSubmit={handleExecuteAnalysisRecipe} className="subsection-box">
+                                <div className="form-group">
+                                    <label htmlFor="recipeSelect">Select Analysis Recipe:</label>
+                                    <select id="recipeSelect" value={selectedAnalysisRecipe ? `${selectedAnalysisRecipe.name}_${selectedAnalysisRecipe.version}` : ""} onChange={(e) => {
+                                            const { name, version } = parseNameVersion(e.target.value);
+                                            if (name && version) { handleAnalysisRecipeChange(name, version); }
+                                            else { setSelectedAnalysisRecipe(null); setAnalysisParams({}); }
+                                        }} disabled={isAnalysisExecuting} >
+                                        <option value="">-- Select Recipe --</option>
+                                        {analysisRecipes.map(recipe => ( <option key={`${recipe.name}_${recipe.version}`} value={`${recipe.name}_${recipe.version}`}> {recipe.name} v{recipe.version} - {recipe.description} </option> ))}
+                                    </select>
+                                </div>
+
+                                {selectedAnalysisRecipe && ( <>
+                                    <div className="parameter-form">
+                                        <h4>Parameters for {selectedAnalysisRecipe.name}:</h4>
+                                        {(() => {
+                                            const baseExclude = ['db_conn_str'];
+                                            const expectsMultipleRepos = selectedAnalysisRecipe.parameters.some(p => p.name === 'repository_ids');
+                                            if (expectsMultipleRepos && selectedRepositoryIds.length > 0) {
+                                                baseExclude.push('repository_ids', 'repository_id');
+                                            }
+                                            return renderParameterInputs(
+                                                selectedAnalysisRecipe.parameters,
+                                                analysisParams,
+                                                setAnalysisParams,
+                                                "analysis",
+                                                baseExclude
+                                            );
+                                        })()}
+                                            {selectedAnalysisRecipe.parameters.some(p => p.name === 'repository_ids') && selectedRepositoryIds.length > 0 && (
+                                            <p className="info-text"><small>Note: The selected {selectedRepositoryIds.length} repository IDs will be automatically passed to the 'repository_ids' parameter.</small></p>
+                                            )}
+                                            {selectedAnalysisRecipe.parameters.some(p => p.name === 'repository_id') && selectedRepositoryIds.length > 0 && (
+                                                <p className="warning-text"><small>Warning: This recipe expects a single 'repository_id'. The list of {selectedRepositoryIds.length} selected IDs cannot be automatically used here. Running the recipe might fail or only process the first ID depending on its implementation.</small></p>
+                                            )}
+                                    </div>
+                                        {analysisExecutionError && !analysisExecutionResult && <ErrorMessage message={analysisExecutionError} />}
+                                    <button type="submit" disabled={isAnalysisExecuting || !selectedAnalysisRecipe} className="action-button">
+                                        {isAnalysisExecuting ? <LoadingSpinner /> : 'Run Analysis on Selected Repositories'}
+                                    </button>
+                                    </> )}
+                            </form>
+                        )}
+                    </>
+                )}
+
+                {renderAnalysisResults()}
+            </div>
+        );
+    };
+
+    const renderStandardAnalysis = () => (
+        <div className="analysis-workflow-section">
+             <h3>Run Standard Analysis Recipe</h3>
+             {isAnalysisLoading && <LoadingSpinner message="Loading recipes..." />}
+             {analysisError && <ErrorMessage message={analysisError} />}
+             {!isAnalysisLoading && !analysisError && analysisRecipes.length === 0 && <p>No analysis recipes found.</p>}
+
+             {!isAnalysisLoading && !analysisError && analysisRecipes.length > 0 && (
+                <form onSubmit={handleExecuteAnalysisRecipe} className="subsection-box">
+                    <div className="form-group">
+                        <label htmlFor="recipeSelectStd">Select Analysis Recipe:</label>
+                        <select id="recipeSelectStd" value={selectedAnalysisRecipe ? `${selectedAnalysisRecipe.name}_${selectedAnalysisRecipe.version}` : ""} onChange={(e) => {
+                                const { name, version } = parseNameVersion(e.target.value);
+                                if (name && version) { handleAnalysisRecipeChange(name, version); }
+                                else { setSelectedAnalysisRecipe(null); setAnalysisParams({}); }
+                            }} disabled={isAnalysisExecuting} >
+                            <option value="">-- Select Recipe --</option>
+                            {analysisRecipes.map(recipe => ( <option key={`${recipe.name}_${recipe.version}`} value={`${recipe.name}_${recipe.version}`}> {recipe.name} v{recipe.version} - {recipe.description} </option> ))}
+                        </select>
+                    </div>
+
+                    {selectedAnalysisRecipe && ( <>
+                        <div className="parameter-form">
+                            <h4>Parameters for {selectedAnalysisRecipe.name}:</h4>
+                            {renderParameterInputs(
+                                selectedAnalysisRecipe.parameters,
+                                analysisParams,
+                                setAnalysisParams, // Pass correct setter
+                                "analysisStd",
+                                ['db_conn_str']
+                            )}
+                        </div>
+                        {analysisExecutionError && !analysisExecutionResult && <ErrorMessage message={analysisExecutionError} />}
+                        <button type="submit" disabled={isAnalysisExecuting || !selectedAnalysisRecipe} className="action-button">
+                            {isAnalysisExecuting ? <LoadingSpinner /> : 'Run Analysis'}
+                        </button>
+                     </> )}
+                </form>
+            )}
+            {renderAnalysisResults()}
+        </div>
+    );
+
+    // --- Main Component Return ---
+    return (
+        <div className="shared-queries-page">
+            <h2>Shared Recipes & Analysis Workflows</h2>
+            <div className="workflow-mode-selection form-group">
+                 <label className="checkbox-label">
+                     <input type="checkbox" checked={workflowStage !== 'initial'} onChange={handleWorkflowModeChange}/>
+                     Enable Institution-Centric Workflow (includes affiliation & discovery steps)
+                 </label>
+                 {(workflowStage === 'affiliation_setup' || workflowStage === 'analysis_selection') && (
+                     <button type="button" onClick={() => handleWorkflowModeChange({ target: { checked: false } } as ChangeEvent<HTMLInputElement>)} className="switch-workflow-button small-button"> Switch back to Standard Recipe Runner </button>
+                 )}
+            </div>
+            <hr/>
+
+            {/* Render content based on workflow stage */}
+            {workflowStage === 'initial' && renderStandardAnalysis()}
+            {workflowStage === 'affiliation_setup' && renderAffiliationSetup()}
+            {workflowStage === 'analysis_selection' && renderAnalysisSelection()}
+
+        </div>
+    );
+};
+
+export default SharedQueriesPage;

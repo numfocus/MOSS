@@ -1,0 +1,295 @@
+// --- COMPLETE MODIFIED FILE: frontend/src/pages/IngestPage.tsx ---
+import React, { useState, useEffect, useRef } from 'react';
+import {
+    triggerUrlIngestion,
+    triggerKeywordIngestion,
+    getKeywordSessionStatus,
+} from '../services/apiClient';
+import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorMessage from '../components/ErrorMessage';
+// Alias KeywordSearchSessionResponse to avoid naming conflict
+import type { DiscoveryChainSummary, KeywordSearchSessionResponse as KeywordResult } from '../services/apiClient';
+import './IngestPage.css';
+
+// Interface for Keyword Polling State (matches KeywordResult now)
+interface KeywordPollState extends KeywordResult {
+    error: string | null; // Add polling-specific error
+    isPolling: boolean;
+}
+
+const IngestPage: React.FC = () => {
+    // State for URL Ingestion
+    const [url, setUrl] = useState<string>('');
+    const [isUrlLoading, setIsUrlLoading] = useState<boolean>(false);
+    const [urlError, setUrlError] = useState<string | null>(null);
+    const [urlSuccess, setUrlSuccess] = useState<DiscoveryChainSummary | null>(null);
+
+    // State for Keyword Ingestion
+    const [keywords, setKeywords] = useState<string>('');
+    const [isKeywordLoading, setIsKeywordLoading] = useState<boolean>(false); // Tracks initial request trigger
+    const [keywordError, setKeywordError] = useState<string | null>(null); // For initial request error
+    // State to hold the latest session data and polling status
+    const [pollState, setPollState] = useState<KeywordPollState | null>(null); // Initialize as null
+    const pollIntervalRef = useRef<number | null>(null); // Type is number | null
+
+    // --- URL Ingestion Handler ---
+    const handleUrlSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        setIsUrlLoading(true);
+        setUrlError(null);
+        setUrlSuccess(null);
+        try {
+            const result = await triggerUrlIngestion(url);
+            setUrlSuccess(result);
+            console.log(`URL Ingestion success. Root chain ID: ${result.id}, Status: ${result.status}`);
+            // Optionally display different message based on result.status
+            if (result.status === 'FAILED') {
+                 setUrlError(`Ingestion failed. Check logs for chain ${result.id}.`);
+            } else if (result.status !== 'COMPLETED') {
+                 setUrlError(`Ingestion ended with status ${result.status}. Check logs for chain ${result.id}.`);
+            }
+            setUrl(''); // Clear input on success/failure trigger
+        } catch (error: any) {
+            setUrlError(error.message);
+        } finally {
+            setIsUrlLoading(false);
+        }
+    };
+
+    // --- Keyword Ingestion Handler ---
+    const handleKeywordSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        setIsKeywordLoading(true);
+        setKeywordError(null);
+        setPollState(null); // Reset previous poll state completely
+        stopPolling(); // Stop any previous polling just in case
+
+        try {
+            const initialSession = await triggerKeywordIngestion(keywords);
+            // Update pollState with initial data and start polling
+            setPollState({
+                ...initialSession, // Spread the initial session data
+                error: null,       // Clear any previous polling error
+                isPolling: true,   // Mark as polling
+            });
+            console.log(`Keyword Ingestion queued. Session ID: ${initialSession.id}`);
+            startPolling(initialSession.id);
+            setKeywords(''); // Clear input on successful queueing
+        } catch (error: any) {
+            setKeywordError(error.message); // Set initial request error
+            setPollState(null); // Ensure no polling state remains on trigger error
+        } finally {
+            setIsKeywordLoading(false); // Stop the initial request loading indicator
+        }
+    };
+
+    // --- Polling Logic ---
+    const stopPolling = () => {
+        if (pollIntervalRef.current !== null) {
+            window.clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+            // Only update the 'isPolling' flag in the existing state,
+            // preserving the other status details received just before stopping.
+            setPollState(prev => {
+                if (prev) {
+                    // Only set isPolling to false if it's currently true
+                    // This prevents unnecessary re-renders if stopPolling is called multiple times
+                    return prev.isPolling ? { ...prev, isPolling: false } : prev;
+                }
+                return null;
+            });
+            console.log("Polling stopped.");
+        }
+    };
+
+    const startPolling = (sessionId: number) => {
+        stopPolling(); // Ensure no duplicate intervals
+
+        const poll = async () => {
+             // Check if we are still supposed to be polling *this* session
+            // Use functional update form of setPollState to get the latest state reliably
+            let shouldStop = false;
+            setPollState(currentState => {
+                if (!currentState || !currentState.isPolling || currentState.id !== sessionId) {
+                    shouldStop = true;
+                    return currentState; // Return current state if not polling this session
+                }
+                return currentState; // Otherwise, continue with the fetch
+            });
+
+            if (shouldStop) {
+                 stopPolling();
+                 return;
+             }
+
+            try {
+                console.log(`Polling status for session ID: ${sessionId}`);
+                const sessionStatus = await getKeywordSessionStatus(sessionId);
+
+                setPollState(prev => {
+                    // Only update if the session ID still matches
+                    if (prev && prev.id === sessionId) {
+                        const isStillPolling = !(sessionStatus.status === 'COMPLETED' || sessionStatus.status === 'FAILED');
+
+                        console.log(`Updating poll state for ${sessionId}: New status=${sessionStatus.status}, isStillPolling=${isStillPolling}`);
+
+                        // Stop the interval *immediately* when we detect completion/failure
+                        if (!isStillPolling && prev.isPolling) { // Stop only if it was previously polling
+                            stopPolling(); // Stop the timer interval
+                        }
+
+                        // Return the new state including the potentially updated isPolling flag
+                        return {
+                           ...sessionStatus,         // Update with latest data
+                           error: null,             // Clear previous polling error
+                           isPolling: isStillPolling, // Reflect if polling should continue *next time*
+                        };
+                    }
+                    return prev; // No change if session ID mismatch
+                });
+
+                // No need for separate stop polling check here
+
+            } catch (error: any) {
+                 console.error(`Error polling status for session ${sessionId}:`, error);
+                 stopPolling(); // Stop polling timer on fetch error
+                 setPollState(prev => {
+                     if (prev && prev.id === sessionId) { // Update error only for the correct session
+                        return {
+                           ...prev, // Keep last known data
+                           error: `Polling failed: ${error.message}`, // Show polling error
+                           isPolling: false, // Ensure polling is marked as stopped
+                         };
+                     }
+                     return prev;
+                 });
+            }
+        };
+
+        poll(); // Initial immediate check
+        pollIntervalRef.current = window.setInterval(poll, 5000);
+    };
+
+
+    // Cleanup interval on component unmount
+    useEffect(() => {
+        return () => {
+            stopPolling();
+        };
+    }, []); // Empty dependency array ensures this runs only on unmount
+
+    // --- Render Keyword Status ---
+    const renderKeywordStatus = () => {
+        if (!pollState || pollState.id === null) return null; // Check if pollState exists and has an ID
+
+        let statusText = `Status: ${pollState.status || 'Unknown'}`;
+        let statusClass = `status-${(pollState.status || 'unknown').toLowerCase()}`;
+        // Determine if spinner should show based on *current* state, not just status string
+        let showSpinner = pollState.isPolling && (pollState.status === 'QUEUED' || pollState.status === 'RUNNING');
+
+        const results = pollState.results_count ?? 0;
+
+        if (pollState.status === 'COMPLETED') {
+            statusText = `Status: COMPLETED (Processed ${results} repositories)`; // Changed "Found" to "Processed"
+        }
+        if (pollState.status === 'FAILED') {
+            statusText = `Status: FAILED`;
+        }
+        if (pollState.status === 'QUEUED'){
+            statusText = `Status: QUEUED...`;
+        }
+        // Show RUNNING even if isPolling becomes false momentarily before COMPLETED/FAILED state arrives
+        if (pollState.status === 'RUNNING'){
+             statusText = `Status: RUNNING... (Processed ${results} so far)`;
+        }
+
+
+        return (
+            <div className={`keyword-status ${statusClass}`}>
+                <p><strong>Keyword Search Session ID: {pollState.id}</strong></p>
+                 {pollState.keywords_raw && <p><strong>Keywords:</strong> {pollState.keywords_raw}</p>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <p style={{ margin: 0 }}>{statusText}</p>
+                    {showSpinner && <LoadingSpinner message="" />}
+                </div>
+                {/* Display polling error */}
+                {pollState.error && <ErrorMessage message={pollState.error} />}
+                 {pollState.created_at && (
+                    <p><small>Queued At: {new Date(pollState.created_at).toLocaleString()}</small></p>
+                )}
+                 {pollState.started_at && pollState.status !== 'QUEUED' && (
+                    <p><small>Started At: {new Date(pollState.started_at).toLocaleString()}</small></p>
+                )}
+                {pollState.completed_at && (
+                    <p><small>Completed At: {new Date(pollState.completed_at).toLocaleString()}</small></p>
+                )}
+            </div>
+        );
+    };
+
+
+    return (
+        <div className="ingest-page">
+            <h2>Ingest Data</h2>
+
+            <section className="ingest-section">
+                <h3>Ingest by Repository URL</h3>
+                <form onSubmit={handleUrlSubmit} className="ingest-form">
+                    <div className="form-group">
+                        <label htmlFor="url">GitHub Repository URL:</label>
+                        <input
+                            type="url"
+                            id="url"
+                            value={url}
+                            onChange={(e) => setUrl(e.target.value)}
+                            placeholder="https://github.com/owner/repo"
+                            required
+                            disabled={isUrlLoading}
+                        />
+                    </div>
+                    <button type="submit" disabled={isUrlLoading || !url}>
+                        {isUrlLoading ? <LoadingSpinner message="" /> : 'Ingest URL'}
+                    </button>
+                </form>
+                {urlError && <ErrorMessage message={urlError} />}
+                {urlSuccess && (
+                    <div className={`success-message status-${urlSuccess.status?.toLowerCase()}`}>
+                        <p>URL Ingestion Task Status: <strong>{urlSuccess.status || 'Unknown'}</strong></p>
+                        {/* Display message based on status */}
+                        {urlSuccess.status === 'COMPLETED' && <p>Ingestion completed successfully.</p>}
+                        {urlSuccess.status === 'FAILED' && <p>Ingestion failed. Check server logs.</p>}
+                        {urlSuccess.status !== 'COMPLETED' && urlSuccess.status !== 'FAILED' && <p>Ingestion ended with unexpected status.</p>}
+                        <p><small>Root Discovery Chain ID: {urlSuccess.id}</small></p>
+                    </div>
+                )}
+            </section>
+
+            <section className="ingest-section">
+                <h3>Discover & Ingest by Keywords</h3>
+                <form onSubmit={handleKeywordSubmit} className="ingest-form">
+                    <div className="form-group">
+                        <label htmlFor="keywords">Keywords:</label>
+                        <input
+                            type="text"
+                            id="keywords"
+                            value={keywords}
+                            onChange={(e) => setKeywords(e.target.value)}
+                            placeholder="e.g., scientific computing python"
+                            required
+                            disabled={isKeywordLoading || pollState?.isPolling} // Disable while queueing or polling
+                        />
+                    </div>
+                    <button type="submit" disabled={isKeywordLoading || pollState?.isPolling || !keywords}>
+                        {isKeywordLoading ? <LoadingSpinner message="" /> : (pollState?.isPolling ? 'Processing...' : 'Search & Ingest')}
+                    </button>
+                </form>
+                 {/* Show initial trigger error */}
+                {keywordError && <ErrorMessage message={keywordError} />}
+                {/* Display polling status */}
+                {renderKeywordStatus()}
+            </section>
+        </div>
+    );
+};
+
+export default IngestPage;

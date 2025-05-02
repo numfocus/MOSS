@@ -1,0 +1,198 @@
+// --- FILE: frontend/src/pages/SearchPage.tsx ---
+// (Corrected Version with Type Assertions)
+
+import { useState, FormEvent } from 'react';
+import { Link } from 'react-router-dom';
+
+// Import API functions and types
+import {
+    searchRepositories, searchWorks, searchPeople, searchInstitutions,
+    RepositorySummary, WorkSummary, PersonSummary, InstitutionSummary
+} from '../services/apiClient';
+
+// Import shared components
+import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorMessage from '../components/ErrorMessage';
+
+import './SearchPage.css';
+
+// Interface for search results state
+interface SearchResults {
+    repositories: RepositorySummary[];
+    works: WorkSummary[];
+    people: PersonSummary[];
+    institutions: InstitutionSummary[];
+}
+
+function SearchPage() {
+    const [query, setQuery] = useState<string>('');
+    const [results, setResults] = useState<SearchResults>({
+        repositories: [],
+        works: [],
+        people: [],
+        institutions: []
+    });
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
+    const [searched, setSearched] = useState<boolean>(false);
+
+    const handleSearch = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (!query.trim()) {
+            setError("Please enter a search query.");
+            setSearched(false);
+            setResults({ repositories: [], works: [], people: [], institutions: [] });
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+        setResults({ repositories: [], works: [], people: [], institutions: [] });
+        setSearched(true);
+
+        try {
+            const searchPromises = [
+                searchRepositories(query),
+                searchWorks(query),
+                searchPeople(query),
+                searchInstitutions(query)
+            ];
+
+            const settledResults = await Promise.allSettled(searchPromises);
+
+            const newResults: SearchResults = {
+                repositories: [],
+                works: [],
+                people: [],
+                institutions: []
+            };
+
+            // --- Add Type Assertions ---
+            if (settledResults[0].status === 'fulfilled') {
+                // Assert that the value is RepositorySummary[]
+                newResults.repositories = settledResults[0].value as RepositorySummary[];
+            }
+            if (settledResults[1].status === 'fulfilled') {
+                 // Assert that the value is WorkSummary[]
+                newResults.works = settledResults[1].value as WorkSummary[];
+            }
+            if (settledResults[2].status === 'fulfilled') {
+                 // Assert that the value is PersonSummary[]
+                newResults.people = settledResults[2].value as PersonSummary[];
+            }
+            if (settledResults[3].status === 'fulfilled') {
+                 // Assert that the value is InstitutionSummary[]
+                newResults.institutions = settledResults[3].value as InstitutionSummary[];
+            }
+            // --- End Type Assertions ---
+
+            setResults(newResults);
+
+            const failedSearches = settledResults.filter(r => r.status === 'rejected');
+            if (failedSearches.length > 0) {
+                console.warn("Some search categories failed:", failedSearches);
+                setError("Some search categories failed. Results might be incomplete.");
+            }
+
+        } catch (err) {
+             const message = err instanceof Error ? err.message : "An unexpected error occurred during search setup.";
+            setError(message);
+            console.error("Error during search setup:", err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const hasResults = results && (
+        results.repositories.length > 0 ||
+        results.works.length > 0 ||
+        results.people.length > 0 ||
+        results.institutions.length > 0
+    );
+
+    return (
+        <div className="search-page">
+            <h2>Search MOSS Entities</h2>
+            <form onSubmit={handleSearch} className="search-form">
+                <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search repositories, works, people, institutions..."
+                    required
+                    className="search-input"
+                />
+                <button type="submit" disabled={isLoading} className="search-button">
+                    {isLoading ? 'Searching...' : 'Search'}
+                </button>
+            </form>
+
+            {isLoading && <LoadingSpinner />}
+            {error && <ErrorMessage message={error} />}
+
+            {searched && !isLoading && (
+                <div className="search-results">
+                     {!error && !hasResults && <p>No results found for "{query}" across all categories.</p>}
+
+                     {results.repositories.length > 0 && (
+                        <div className="results-category">
+                            <h4>Repositories ({results.repositories.length})</h4>
+                            <ul>
+                                {results.repositories.map(repo => (
+                                    <li key={`repo-${repo.id}`}>
+                                        <Link to={`/repositories/${repo.id}`}>{repo.full_name}</Link>
+                                        {repo.language && ` (${repo.language})`}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                     )}
+
+                    {results.works.length > 0 && (
+                        <div className="results-category">
+                            <h4>Works ({results.works.length})</h4>
+                             <ul>
+                                {results.works.map(work => (
+                                    <li key={`work-${work.id}`}>
+                                        <Link to={`/works/${work.id}`}>{work.title || work.doi || `Work ID ${work.id}`}</Link>
+                                        {work.publication_year && ` (${work.publication_year})`}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {results.people.length > 0 && (
+                         <div className="results-category">
+                            <h4>People ({results.people.length})</h4>
+                            <ul>
+                                {results.people.map(person => (
+                                    <li key={`person-${person.id}`}>
+                                        <Link to={`/persons/${person.id}`}>{person.display_name}</Link>
+                                        {person.orcid && ` (ORCID: ${person.orcid})`}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {results.institutions.length > 0 && (
+                         <div className="results-category">
+                            <h4>Institutions ({results.institutions.length})</h4>
+                            <ul>
+                                {results.institutions.map(inst => (
+                                    <li key={`inst-${inst.id}`}>
+                                        <Link to={`/institutions/${inst.id}`}>{inst.display_name}</Link>
+                                        {inst.ror && ` (ROR: ${inst.ror})`}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+export default SearchPage;

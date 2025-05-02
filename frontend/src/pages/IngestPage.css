@@ -1,0 +1,91 @@
+/* frontend\src\pages\IngestPage.css */
+.ingest-page h2 {
+    margin-bottom: 2rem;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.5rem;
+  }
+  
+  .ingest-section {
+    margin-bottom: 2.5rem;
+    padding: 1.5rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background-color: #fdfdfd;
+  }
+  
+  .ingest-section h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #444;
+  }
+  
+  .ingest-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .ingest-form label {
+    font-weight: bold;
+    margin-bottom: -0.5rem; /* Pull label closer to input */
+    color: #555;
+  }
+  
+  .ingest-form input[type="url"],
+  .ingest-form input[type="text"] {
+    padding: 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+  }
+  
+  .ingest-form input:disabled {
+      background-color: #eee;
+      cursor: not-allowed;
+  }
+  
+  
+  .ingest-form button {
+    padding: 0.75rem 1.5rem;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    align-self: flex-start; /* Align button to the left */
+  }
+  
+  .ingest-form button:hover:not(:disabled) {
+    background-color: #0056b3;
+  }
+  
+  .ingest-form button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
+  
+  .success-message {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background-color: #d4edda; /* Light green */
+    color: #155724; /* Dark green */
+    border: 1px solid #c3e6cb;
+    border-radius: 4px;
+    font-size: 0.95em;
+    white-space: pre-wrap; /* Wrap long messages */
+    word-wrap: break-word;
+  }
+  
+  /* Ensure ErrorMessage has margin */
+  .ingest-section .error-message {
+      margin-top: 1rem;
+  }
+  
+  /* Ensure LoadingSpinner has margin */
+   .ingest-section .loading-spinner-overlay {
+      margin-top: 1rem;
+      padding: 1rem; /* Reduce padding */
+  }

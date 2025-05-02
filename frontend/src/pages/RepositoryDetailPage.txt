@@ -1,0 +1,425 @@
+// --- MODIFIED FILE: frontend/src/pages/RepositoryDetailPage.tsx ---
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { Node, Edge } from 'reactflow'; // Keep if graph used
+import GraphDisplay from '../components/GraphDisplay'; // Keep if graph used
+import {
+    getRepository,
+    getRepositoryWorks,
+    getRepositoryCitationCount,
+    getRepositoriesSharingContributors,
+    getRepositoriesSharingWorks,
+    getRepositoryAffiliationsFiltered,
+    getSharedContributorsDetails,
+    getRepositoryDependencies, // <<< Added
+} from '../services/apiClient';
+import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorMessage from '../components/ErrorMessage';
+import SimpleTable from '../components/SimpleTable'; // <<< Added
+import type {
+    RepositoryResponse,
+    RepositorySummary,
+    WorkSummary,
+    RepositoryCitationCountResponse,
+    AffiliationResultResponse,
+    ContributorResponse,
+    SoftwareDependencyResponse, // <<< Added
+} from '../services/apiClient';
+
+interface CitationCountState {
+    data: RepositoryCitationCountResponse | null;
+    loading: boolean;
+    error: string | null;
+}
+
+interface RelatedReposState { repos: RepositorySummary[]; loading: boolean; error: string | null; }
+interface LinkedWorksState { works: WorkSummary[]; loading: boolean; error: string | null; }
+interface AffiliationsState { affiliations: AffiliationResultResponse[]; loading: boolean; error: string | null; }
+// --- Added State Interface ---
+interface DependenciesState { dependencies: SoftwareDependencyResponse[]; loading: boolean; error: string | null; }
+// --- End Added State Interface ---
+
+interface SharedContributorsDetailsState {
+    [repoId: number]: {
+        contributors: ContributorResponse[];
+        loading: boolean;
+        error: string | null;
+    } | undefined;
+}
+
+const RepositoryDetailPage: React.FC = () => {
+    const { id } = useParams<{ id: string }>();
+    const repoId = parseInt(id || '0', 10);
+
+    const [repository, setRepository] = useState<RepositoryResponse | null>(null);
+    const [isLoadingRepo, setIsLoadingRepo] = useState(true);
+    const [repoError, setRepoError] = useState<string | null>(null);
+
+    const [linkedWorks, setLinkedWorks] = useState<LinkedWorksState>({ works: [], loading: false, error: null });
+    const [citationCount, setCitationCount] = useState<CitationCountState>({ data: null, loading: false, error: null });
+    const [sharedContribRepos, setSharedContribRepos] = useState<RelatedReposState>({ repos: [], loading: false, error: null });
+    const [sharedWorksRepos, setSharedWorksRepos] = useState<RelatedReposState>({ repos: [], loading: false, error: null });
+    const [affiliations, setAffiliations] = useState<AffiliationsState>({ affiliations: [], loading: false, error: null });
+    // --- Added State ---
+    const [dependencies, setDependencies] = useState<DependenciesState>({ dependencies: [], loading: false, error: null });
+    // --- End Added State ---
+    const [sharedContributorsDetails, setSharedContributorsDetails] = useState<SharedContributorsDetailsState>({});
+
+    const [graphNodes, setGraphNodes] = useState<Node[]>([]);
+    const [graphEdges, setGraphEdges] = useState<Edge[]>([]);
+
+    const fetchAllRelatedData = useCallback((currentRepoId: number) => {
+         console.log(`Fetching related data for repository ID: ${currentRepoId}`);
+         setLinkedWorks(prev => ({ ...prev, loading: true, error: null }));
+         getRepositoryWorks(currentRepoId) .then(data => setLinkedWorks({ works: data, loading: false, error: null })) .catch(error => setLinkedWorks({ works: [], loading: false, error: (error as Error).message }));
+
+         setCitationCount(prev => ({ ...prev, loading: true, error: null }));
+         getRepositoryCitationCount(currentRepoId)
+             .then(data => { setCitationCount({ data: data, loading: false, error: null }); })
+             .catch (error => { setCitationCount({ data: null, loading: false, error: (error as Error).message }); });
+
+         setSharedContribRepos(prev => ({ ...prev, loading: true, error: null }));
+         getRepositoriesSharingContributors(currentRepoId) .then(data => setSharedContribRepos({ repos: data, loading: false, error: null })) .catch(error => setSharedContribRepos({ repos: [], loading: false, error: (error as Error).message }));
+         setSharedWorksRepos(prev => ({ ...prev, loading: true, error: null }));
+         getRepositoriesSharingWorks(currentRepoId) .then(data => setSharedWorksRepos({ repos: data, loading: false, error: null })) .catch(error => setSharedWorksRepos({ repos: [], loading: false, error: (error as Error).message }));
+
+         setAffiliations(prev => ({ ...prev, loading: true, error: null }));
+         getRepositoryAffiliationsFiltered(currentRepoId)
+             .then(data => setAffiliations({ affiliations: data, loading: false, error: null }))
+             .catch(error => setAffiliations({ affiliations: [], loading: false, error: (error as Error).message }));
+
+        // --- Added Fetch ---
+        setDependencies(prev => ({ ...prev, loading: true, error: null }));
+        getRepositoryDependencies(currentRepoId)
+            .then(data => setDependencies({ dependencies: data, loading: false, error: null }))
+            .catch(error => setDependencies({ dependencies: [], loading: false, error: (error as Error).message }));
+        // --- End Added Fetch ---
+
+
+        setSharedContributorsDetails({});
+
+    }, []);
+
+    useEffect(() => {
+         if (!repoId || isNaN(repoId)) { setRepoError('Invalid Repository ID.'); setIsLoadingRepo(false); return; }
+        const fetchRepoData = async () => {
+            setIsLoadingRepo(true);
+            setRepoError(null);
+            setGraphNodes([]); setGraphEdges([]);
+            setLinkedWorks({ works: [], loading: false, error: null });
+            setCitationCount({ data: null, loading: false, error: null });
+            setSharedContribRepos({ repos: [], loading: false, error: null });
+            setSharedWorksRepos({ repos: [], loading: false, error: null });
+            setAffiliations({ affiliations: [], loading: false, error: null });
+            setDependencies({ dependencies: [], loading: false, error: null }); // Reset deps state
+            setSharedContributorsDetails({});
+
+            try {
+                const repoData = await getRepository(repoId);
+                setRepository(repoData);
+                fetchAllRelatedData(repoId);
+            } catch (error) {
+                setRepoError((error as Error).message);
+            } finally {
+                setIsLoadingRepo(false);
+            }
+        };
+        fetchRepoData();
+    }, [repoId, fetchAllRelatedData]);
+
+    // --- Graph useEffect remains the same ---
+    useEffect(() => {
+        if (!repository) return;
+        const nodes: Node[] = [];
+        const edges: Edge[] = [];
+        const mainNodeId = `repo-${repository.id}`;
+        const nodeXOffsetLeft = 50;
+
+        nodes.push({
+            id: mainNodeId, data: { label: repository.full_name },
+            position: { x: 250, y: 250 },
+            style: { background: '#aaaaff', fontWeight: 'bold', width: 150, textAlign: 'center', border: '1px solid #66f' },
+        });
+
+        let currentLeftY = 50;
+
+        linkedWorks.works.forEach((work, index) => {
+            const workNodeId = `work-${work.id}`;
+            nodes.push({
+                id: workNodeId, data: { label: work.title || `Work ${work.id}` },
+                position: { x: nodeXOffsetLeft, y: currentLeftY + index * 100 },
+                style: { background: '#aaffaa', width: 150, textAlign: 'center', border: '1px solid #6f6' }
+            });
+            edges.push({ id: `e-${mainNodeId}-links-${workNodeId}`, source: mainNodeId, target: workNodeId, label: 'links work' });
+        });
+        currentLeftY += Math.max(0, linkedWorks.works.length) * 100 + 50; // Add spacing
+
+        affiliations.affiliations.forEach((affil, index) => {
+             const instNodeId = `inst-${affil.institution_id}`;
+             if (!nodes.some(n => n.id === instNodeId)) {
+                 nodes.push({
+                     id: instNodeId, data: { label: affil.institution_name || `Inst ${affil.institution_id}` },
+                     position: { x: nodeXOffsetLeft, y: currentLeftY + index * 100 },
+                     style: { background: '#ffccaa', width: 150, textAlign: 'center', border: '1px solid #f96' }
+                 });
+             }
+             edges.push({ id: `e-affil-${mainNodeId}-${instNodeId}`, source: mainNodeId, target: instNodeId, label: `affiliated (${affil.confidence_score.toFixed(2)})`, type: 'smoothstep', style: { stroke: '#f96' } });
+        });
+
+        setGraphNodes(nodes);
+        setGraphEdges(edges);
+
+    }, [repository, linkedWorks.works, affiliations.affiliations]);
+
+    // --- handleShowSharedContributors remains the same ---
+    const handleShowSharedContributors = async (otherRepoId: number) => {
+        if (!repoId) return;
+
+         if (sharedContributorsDetails[otherRepoId]) {
+             setSharedContributorsDetails(prev => ({
+                 ...prev,
+                 [otherRepoId]: undefined
+             }));
+             return;
+         }
+
+        setSharedContributorsDetails(prev => ({
+            ...prev,
+            [otherRepoId]: { contributors: [], loading: true, error: null }
+        }));
+
+        try {
+            const contributors = await getSharedContributorsDetails(repoId, otherRepoId);
+            setSharedContributorsDetails(prev => ({
+                ...prev,
+                [otherRepoId]: { contributors: contributors, loading: false, error: null }
+            }));
+        } catch (error) {
+             setSharedContributorsDetails(prev => ({
+                ...prev,
+                [otherRepoId]: { contributors: [], loading: false, error: (error as Error).message }
+            }));
+        }
+    };
+
+
+    // --- Render Helper Functions ---
+    // --- renderLinkedItems remains the same ---
+    const renderLinkedItems = <T extends { id: number; full_name?: string | null; title?: string | null; language?: string | null; doi?: string | null; publication_year?: number | null; }> (
+        title: string,
+        items: T[],
+        loading: boolean,
+        error: string | null,
+        linkPrefix: string,
+        emptyMessage: string,
+        isSharedContributorsList?: boolean
+    ) => {
+        return (
+            <div className="detail-section">
+                <h4>{title}</h4>
+                {loading && <LoadingSpinner message="" />}
+                {error && <ErrorMessage message={error} />}
+                {!loading && !error && items.length > 0 && (
+                    <ul>
+                        {items.map(item => {
+                            // --- Correction Start ---
+                            // Get the details object for the current item *outside* the inner JSX
+                            const details = sharedContributorsDetails[item.id];
+                            // --- Correction End ---
+
+                            return (
+                                <li key={item.id}>
+                                    <Link to={`${linkPrefix}/${item.id}`}>
+                                        {item.full_name || item.title || `ID ${item.id}`}
+                                    </Link>
+                                    {'language' in item && item.language && ` (${item.language})`}
+                                    {'doi' in item && item.doi && ` (DOI: ${item.doi})`}
+                                    {'publication_year' in item && item.publication_year && ` [${item.publication_year}]`}
+
+                                    {isSharedContributorsList && (
+                                        <>
+                                            <button
+                                                onClick={() => handleShowSharedContributors(item.id)}
+                                                style={{ marginLeft: '10px', fontSize: '0.8em', padding: '2px 5px' }}
+                                                disabled={details?.loading} // Use the local variable
+                                            >
+                                                {details?.loading ? 'Loading...' : (details ? 'Hide' : 'Show')} Shared
+                                            </button>
+                                            {/* --- Correction Start --- */}
+                                            {/* Use the local variable `details` here, which is guaranteed to be defined if this block renders */}
+                                            {details && !details.loading && (
+                                                <div style={{ marginLeft: '20px', marginTop: '5px', fontSize: '0.9em', borderLeft: '2px solid #eee', paddingLeft: '10px' }}>
+                                                    {details.error && <ErrorMessage message={details.error || 'Error fetching details'} />}
+                                                    {!details.error && details.contributors.length === 0 && <span>(No specific shared contributors found - data mismatch?)</span>}
+                                                    {!details.error && details.contributors.length > 0 && (
+                                                        <>
+                                                            Shared ({details.contributors.length}):{' '}
+                                                            {details.contributors.map((c, index) => (
+                                                                <React.Fragment key={c.id}>
+                                                                     <a href={c.html_url ?? '#'} target="_blank" rel="noopener noreferrer">{c.login}</a>
+                                                                    {index < details.contributors.length - 1 ? ', ' : ''}
+                                                                </React.Fragment>
+                                                            ))}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {/* --- Correction End --- */}
+                                        </>
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
+                {!loading && !error && items.length === 0 && <p>{emptyMessage}</p>}
+            </div>
+        );
+    };
+    // --- renderCitationCounts remains the same ---
+    const renderCitationCounts = () => (
+         <div className="detail-section">
+            <h4>Citation Counts</h4>
+            {citationCount.loading && <LoadingSpinner message="" />}
+            {citationCount.error && <ErrorMessage message={citationCount.error} />}
+            {citationCount.data !== null && !citationCount.loading && (
+                <>
+                    <p>
+                        OpenAlex Aggregated Citations:
+                        <strong>{citationCount.data.openalex_aggregated_citations ?? 'N/A'}</strong>
+                        <br/>
+                        <small>(Sum of cited_by_count from linked works as reported by OpenAlex)</small>
+                    </p>
+                    <p>
+                        MOSS Discovered Citations:
+                        <strong>{citationCount.data.moss_discovered_citations ?? 'N/A'}</strong>
+                        <br/>
+                        <small>(Count of unique citing works discovered and linked within MOSS)</small>
+                    </p>
+                </>
+            )}
+            {citationCount.data === null && !citationCount.loading && !citationCount.error && (
+                <p>Citation count data not available.</p>
+            )}
+        </div>
+    );
+    // --- renderAffiliationsList remains the same ---
+    const renderAffiliationsList = (
+        state: AffiliationsState
+    ) => (
+         <div className="detail-section">
+            <h4>Affiliated Institutions (Calculated)</h4>
+            {state.loading && <LoadingSpinner message="" />}
+            {state.error && <ErrorMessage message={state.error} />}
+            {!state.loading && !state.error && state.affiliations.length > 0 && (
+                <ul>
+                    {state.affiliations.map((affil) => (
+                        <li key={`${affil.institution_id}-${affil.algorithm_name}-${affil.algorithm_version}`}>
+                            <Link to={`/institutions/${affil.institution_id}`}>{affil.institution_name}</Link>
+                            <span style={{ marginLeft: '10px', color: '#666', fontSize: '0.9em' }}>
+                                (Score: {affil.confidence_score.toFixed(2)}, Algo: {affil.algorithm_name} v{affil.algorithm_version}, Date: {new Date(affil.calculated_at).toLocaleDateString()})
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {!state.loading && !state.error && state.affiliations.length === 0 && (
+                <p>No calculated affiliations found.</p>
+            )}
+        </div>
+    );
+
+    // --- Added Render Function for Dependencies ---
+    const renderDependencies = (state: DependenciesState) => {
+        // Prepare data for SimpleTable, transforming boolean to string
+        const tableData = state.dependencies.map(dep => ({
+            ...dep,
+            is_dev_dependency: dep.is_dev_dependency === null ? '' : String(dep.is_dev_dependency),
+        }));
+
+        return (
+            <div className="detail-section">
+                <h4>Software Dependencies</h4>
+                {state.loading && <LoadingSpinner message="" />}
+                {state.error && <ErrorMessage message={state.error} />}
+                {!state.loading && !state.error && tableData.length > 0 && (
+                     <SimpleTable data={tableData} columns={[
+                         { key: 'dependency_name', header: 'Name' },
+                         { key: 'version_constraint', header: 'Version' },
+                         { key: 'dependency_type', header: 'Type' },
+                         { key: 'source_file', header: 'Source' },
+                         { key: 'is_dev_dependency', header: 'Dev?' },
+                     ]} />
+                )}
+                {!state.loading && !state.error && tableData.length === 0 && (
+                    <p>No software dependencies found in supported files (requirements.txt, package.json).</p>
+                )}
+            </div>
+        );
+    };
+    // --- End Added Render Function ---
+
+    // --- Main Component Render ---
+    if (isLoadingRepo) return <LoadingSpinner message={`Loading repository ${id}...`} />;
+    if (repoError) return <ErrorMessage message={repoError} />;
+    if (!repository) return <p>Repository not found.</p>;
+
+    return (
+        <div className="detail-page repo-detail">
+            <h2>Repository: {repository.full_name}</h2>
+             <p><strong>ID:</strong> {repository.id}</p>
+             <p><strong>GitHub ID:</strong> {repository.github_id}</p>
+             <p><strong>Language:</strong> {repository.language || 'N/A'}</p>
+             <p><strong>Description:</strong> {repository.description || 'N/A'}</p>
+             <p><strong>Stars:</strong> {repository.stargazers_count}</p>
+             <p><strong>URL:</strong> <a href={repository.html_url ?? '#'} target="_blank" rel="noopener noreferrer">{repository.html_url}</a></p>
+             {repository.license && (
+                 <p>
+                    <strong>License:</strong>{' '}
+                    {repository.license.url ? (<a href={repository.license.url} target="_blank" rel="noopener noreferrer">{repository.license.name || repository.license.spdx_id}</a>)
+                    : (repository.license.name || repository.license.spdx_id || 'Info Available')}
+                 </p>
+             )}
+             {repository.topics && repository.topics.length > 0 && (
+                 <div className="topics-list">
+                      <strong>Topics:</strong>{' '}
+                      {repository.topics.map((topic, index) => (<span key={index} className="topic-badge">{topic}</span>))}
+                 </div>
+             )}
+            {repository.gh_created_at && <p><small>Created on GitHub: {new Date(repository.gh_created_at).toLocaleString()}</small></p>}
+            {repository.gh_updated_at && <p><small>Updated on GitHub: {new Date(repository.gh_updated_at).toLocaleString()}</small></p>}
+            {repository.gh_pushed_at && <p><small>Last Push to GitHub: {new Date(repository.gh_pushed_at).toLocaleString()}</small></p>}
+
+            <hr />
+
+            {renderCitationCounts()}
+            {renderLinkedItems( "Linked Scholarly Works", linkedWorks.works, linkedWorks.loading, linkedWorks.error, "/works", "No linked scholarly works found." )}
+            {/* --- Added Call to Render Dependencies --- */}
+            {renderDependencies(dependencies)}
+            {/* --- End Added Call --- */}
+            {renderLinkedItems(
+                "Repositories Sharing Contributors",
+                sharedContribRepos.repos,
+                sharedContribRepos.loading,
+                sharedContribRepos.error,
+                "/repositories",
+                "No other repositories found sharing contributors.",
+                true
+            )}
+            {renderLinkedItems( "Repositories Sharing Linked Works", sharedWorksRepos.repos, sharedWorksRepos.loading, sharedWorksRepos.error, "/repositories", "No other repositories found linking to the same works." )}
+            {renderAffiliationsList(affiliations)}
+
+
+            <div className="detail-section">
+                <h4>Relationship Graph</h4>
+                {graphNodes.length > 1 ? (
+                    <GraphDisplay initialNodes={graphNodes} initialEdges={graphEdges} height="600px" />
+                ) : (
+                    <p>No direct relationships found to visualize.</p>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default RepositoryDetailPage;

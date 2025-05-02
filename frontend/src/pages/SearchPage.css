@@ -1,0 +1,84 @@
+/* --- FILE: frontend/src/pages/SearchPage.css --- */
+
+.search-page {
+    padding: 20px;
+}
+
+.search-form {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    align-items: center;
+}
+
+.search-input {
+    flex-grow: 1;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.search-button {
+    padding: 8px 15px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s ease;
+}
+
+.search-button:disabled {
+    background-color: #a0cfff;
+    cursor: not-allowed;
+}
+
+.search-button:not(:disabled):hover {
+    background-color: #0056b3;
+}
+
+.search-results {
+    margin-top: 30px;
+}
+
+.results-category {
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 1px dashed #eee;
+}
+
+.results-category:last-child {
+    border-bottom: none;
+}
+
+.results-category h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.results-category ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.results-category li {
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+.results-category li a {
+    color: #0056b3;
+    text-decoration: none;
+}
+
+.results-category li a:hover {
+    text-decoration: underline;
+}
+
+.results-category p {
+    color: #666;
+    font-style: italic;
+}

@@ -1,0 +1,34 @@
+# --- UPDATED FILE: requirements.txt ---
+
+# Configuration
+python-dotenv
+
+# Database ORM and Migrations
+SQLAlchemy
+psycopg2-binary # For PostgreSQL connection (use non-binary in production if needed)
+alembic
+
+# HTTP Requests
+requests
+
+# UUID Generation (Needed for DiscoveryChain ID) - Standard library 'uuid' used.
+
+# --- ADDED FOR PHASE 2 API ---
+# Web Framework
+fastapi
+
+concurrent-log-handler>=0.9.23 # Or latest version
+
+# ASGI Server
+uvicorn[standard] # Includes standard extras like httptools, websockets
+# --- END ADDED FOR PHASE 2 API ---
+
+# Background Task Queue
+celery>=5.3.6 # Use a specific recent version
+redis>=5.0.4
+
+# --- ADDED FOR PHASE 17 Analysis ---
+# Graph Analysis
+networkx>=3.0 # Use version 3+
+python-louvain # For Louvain community detection
+# --- END ADDED FOR PHASE 17 Analysis ---

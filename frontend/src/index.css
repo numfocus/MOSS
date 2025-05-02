@@ -1,0 +1,408 @@
+/* --- CORRECTED FILE: frontend/src/index.css --- */
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
+
+  color-scheme: light dark;
+
+  /* --- FIXED BASE STYLES (Align with Light Theme Variables) --- */
+  /* Set default text color suitable for the light background */
+  color: #212529; /* Or use var(--input-color) */
+  /* Set default background using the light theme variable */
+  background-color: var(--body-bg-color);
+  /* --- END FIXED BASE STYLES --- */
+
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* CSS variables for easier theming (Defaulting to LIGHT mode) */
+  --body-bg-color: #f8f9fa;
+  --content-bg-color: #ffffff;
+  --header-color: #333;
+  --header-color-secondary: #555;
+  --input-bg: #fff;
+  --input-color: #212529; /* Base text color for light mode */
+  --link-color: #5c6bc0;
+  --link-hover-color: #3f51b5;
+  --button-bg-color: #5c6bc0;
+  --button-text-color: white;
+  --button-hover-bg-color: #3f51b5;
+  --button-border-color: #5c6bc0;
+  --button-hover-border-color: #3f51b5;
+  --button-focus-outline-color: #7986cb;
+  --button-disabled-bg-color: #cccccc;
+  --button-disabled-text-color: #666666;
+  --button-disabled-border-color: #cccccc;
+  --border-color: #dee2e6;
+  --header-bg-color: #343a40;
+  --header-link-color: #adb5bd;
+  --header-link-hover-color: #f8f9fa;
+  --header-link-active-color: #ffffff;
+  --header-link-active-border-color: #5c6bc0;
+  --footer-bg-color: #e9ecef;
+  --footer-text-color: #495057;
+  --footer-border-color: #dee2e6;
+  --success-bg: #d4edda;
+  --success-text: #155724;
+  --success-border: #c3e6cb;
+  --status-bg: #f8f9fa;
+  --status-border: #eee;
+  --status-queued-border: #ffc107;
+  --status-queued-bg: #fff3cd;
+  --status-running-border: #17a2b8;
+  --status-running-bg: #d1ecf1;
+  --status-completed-border: #28a745;
+  --status-completed-bg: #d4edda;
+  --status-failed-border: #dc3545;
+  --status-failed-bg: #f8d7da;
+  --status-unknown-border: #6c757d;
+  --status-unknown-bg: #e2e3e5;
+}
+
+#root {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  /* Background is now handled by :root or dark mode */
+  /* color is inherited from :root */
+}
+
+a {
+  font-weight: 500;
+  color: var(--link-color);
+  text-decoration: inherit;
+  transition: color 0.2s ease-in-out;
+}
+a:hover {
+  color: var(--link-hover-color);
+}
+
+button {
+  border-radius: 6px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: var(--button-bg-color);
+  color: var(--button-text-color);
+  border-color: var(--button-border-color);
+  cursor: pointer;
+  transition: background-color 0.25s, border-color 0.25s;
+  margin-right: 0.5rem;
+}
+button:hover {
+  background-color: var(--button-hover-bg-color);
+  border-color: var(--button-hover-border-color);
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+  outline-color: var(--button-focus-outline-color);
+}
+button:disabled {
+    background-color: var(--button-disabled-bg-color);
+    color: var(--button-disabled-text-color);
+    cursor: not-allowed;
+    border-color: var(--button-disabled-border-color);
+}
+
+/* --- Styles for Layout --- */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--body-bg-color); /* Use variable */
+}
+
+.app-header {
+  background-color: var(--header-bg-color);
+  color: white; /* Header text is white */
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+  flex-shrink: 0;
+}
+
+.app-header h1 a {
+  color: white;
+  text-decoration: none;
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+.app-nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: 2rem;
+}
+
+.app-nav a {
+  color: var(--header-link-color);
+  text-decoration: none;
+  padding: 0.5rem 0;
+  transition: color 0.2s ease-in-out;
+  font-weight: 500;
+}
+
+.app-nav a:hover {
+  color: var(--header-link-hover-color);
+}
+.app-nav a.active-link {
+  color: var(--header-link-active-color);
+  border-bottom: 3px solid var(--header-link-active-border-color);
+}
+
+.app-content {
+  flex-grow: 1;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 1rem auto 2rem auto;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: var(--content-bg-color); /* Uses light/white bg variable */
+  /* Text color will be inherited from :root (now dark) */
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.app-footer {
+  text-align: center;
+  padding: 1.5rem;
+  margin-top: auto;
+  background-color: var(--footer-bg-color);
+  color: var(--footer-text-color);
+  border-top: 1px solid var(--footer-border-color);
+  font-size: 0.9em;
+  flex-shrink: 0;
+}
+
+/* --- Page Specific Base Styles --- */
+
+h2, h3, h4 {
+    color: var(--header-color); /* Uses dark color variable */
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+
+h2 { font-size: 1.8em; }
+h3 { font-size: 1.4em; }
+h4 { font-size: 1.15em; color: var(--header-color-secondary); } /* Uses slightly lighter dark color variable */
+
+
+hr {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 1.5rem 0;
+}
+
+/* Detail page section styling */
+.detail-section {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+.detail-section h4 {
+    margin-bottom: 0.8rem;
+}
+.detail-section ul {
+    list-style: disc;
+    margin-left: 1.5rem;
+    padding-left: 0.5rem;
+    line-height: 1.7;
+}
+.detail-section li {
+    margin-bottom: 0.4rem;
+}
+.detail-section p {
+    margin-bottom: 0.5rem;
+    /* Text color inherited from .app-content / :root */
+}
+
+/* Form styling */
+.ingest-section {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+.ingest-section:last-of-type {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  /* Text color inherited */
+}
+.form-group input[type="url"],
+.form-group input[type="text"] {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ced4da; /* Explicit border */
+  border-radius: 4px;
+  box-sizing: border-box;
+  background-color: var(--input-bg); /* Uses variable (light/dark) */
+  color: var(--input-color); /* Uses variable (dark/light) */
+}
+.form-group input[type="url"]:disabled,
+.form-group input[type="text"]:disabled {
+    background-color: #e9ecef; /* Specific disabled background */
+    cursor: not-allowed;
+}
+
+
+.success-message {
+    margin-top: 1rem;
+    padding: 0.8rem 1rem;
+    background-color: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid var(--success-border);
+    border-radius: 4px;
+}
+.success-message p {
+    margin: 0.2rem 0;
+}
+
+/* Keyword Status Styling */
+.keyword-status {
+    margin-top: 1rem;
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--status-border);
+    border-radius: 4px;
+    background-color: var(--status-bg);
+    border-left-width: 5px;
+    border-left-style: solid;
+    /* Text color inherited */
+}
+.keyword-status p { margin: 0.3rem 0; }
+.status-queued { border-left-color: var(--status-queued-border); background-color: var(--status-queued-bg);}
+.status-running { border-left-color: var(--status-running-border); background-color: var(--status-running-bg);}
+.status-completed { border-left-color: var(--status-completed-border); background-color: var(--status-completed-bg);}
+.status-failed { border-left-color: var(--status-failed-border); background-color: var(--status-failed-bg);}
+.status-unknown { border-left-color: var(--status-unknown-border); background-color: var(--status-unknown-bg);}
+
+/* Topic badge from Repository Detail */
+.topics-list { margin-top: 0.5rem; margin-bottom: 0.5rem; }
+.topic-badge {
+    display: inline-block;
+    background-color: #e0e0e0;
+    color: #333;
+    padding: 0.2rem 0.5rem;
+    margin-right: 0.4rem;
+    margin-bottom: 0.4rem;
+    border-radius: 1rem;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+/* --- END Styles for Layout --- */
+
+
+/* Dark mode specific styles */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Overrides for dark mode */
+    --body-bg-color: #212529;
+    --content-bg-color: #2c3034;
+    --header-color: #e9ecef;
+    --header-color-secondary: #adb5bd;
+    --input-bg: #343a40;
+    --input-color: #f8f9fa; /* Base text color for dark mode */
+    --link-color: #9fa8da;
+    --link-hover-color: #7986cb;
+    --button-bg-color: #7986cb;
+    --button-text-color: #ffffff;
+    --button-hover-bg-color: #5c6bc0;
+    --button-border-color: #7986cb;
+    --button-hover-border-color: #5c6bc0;
+    --button-focus-outline-color: #5c6bc0;
+    --button-disabled-bg-color: #495057;
+    --button-disabled-text-color: #adb5bd;
+    --button-disabled-border-color: #495057;
+    --border-color: #495057;
+    --header-bg-color: #1c1f23;
+    --header-link-color: #adb5bd;
+    --header-link-hover-color: #ffffff;
+    --header-link-active-color: #ffffff;
+    --header-link-active-border-color: #9fa8da;
+    --footer-bg-color: #1c1f23;
+    --footer-text-color: #adb5bd;
+    --footer-border-color: #343a40;
+    --success-bg: #1c4a2a;
+    --success-text: #c3e6cb;
+    --success-border: #245c35;
+    --status-bg: #343a40;
+    --status-border: #495057;
+    --status-queued-border: #ffc107;
+    --status-queued-bg: #4d3e10;
+    --status-running-border: #17a2b8;
+    --status-running-bg: #23474e;
+    --status-completed-border: #28a745;
+    --status-completed-bg: #1c4a2a;
+    --status-failed-border: #dc3545;
+    --status-failed-bg: #5a2126;
+    --status-unknown-border: #6c757d;
+    --status-unknown-bg: #495057;
+
+    /* Explicitly override base text color for dark mode */
+    color: var(--input-color); /* Uses the light text color variable */
+  }
+
+  /* Explicit overrides for dark mode if needed, beyond variables */
+  body { background-color: var(--body-bg-color); color: var(--input-color); } /* Ensure body text color is set */
+  a { color: var(--link-color); }
+  a:hover { color: var(--link-hover-color); }
+
+  .topic-badge { background-color: #495057; color: #e9ecef; }
+
+  .form-group input[type="url"]:disabled,
+  .form-group input[type="text"]:disabled {
+      background-color: #3a3f44;
+  }
+
+  /* Explicitly set text color for elements that might inherit incorrectly */
+  .detail-section p, .detail-section li {
+      color: var(--input-color); /* Ensure these inherit the correct dark mode text color */
+  }
+  .keyword-status {
+       color: var(--input-color); /* Ensure text in status box is readable */
+  }
+   .keyword-status p small { /* Make small text slightly less bright */
+       color: #adb5bd;
+   }
+
+   .form-group label {
+      color: #ced4da; /* Lighter label color for dark mode */
+   }
+   .ingest-section h3 {
+     color: #dee2e6;
+   }
+   .search-results .results-category h4 {
+      color: #e9ecef;
+   }
+    .search-results .results-category li {
+       color: var(--input-color); /* Make sure list items are readable */
+   }
+
+
+}
