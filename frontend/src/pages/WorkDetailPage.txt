@@ -1,0 +1,296 @@
+// --- CORRECTED FILE: frontend/src/pages/WorkDetailPage.tsx ---
+import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import {
+    getWork, getWorkRepositories, getWorkCitations, getWorkReferences,
+    getWorkCitingPeople, getWorkCitingInstitutions, handleApiError,
+    WorkResponse, RepositorySummary, WorkSummary, PersonSummary, InstitutionSummary,
+    // --- ADDED Topic/Hierarchy Interfaces ---
+    PrimaryTopicResponse, TopicSummary
+    // --- END ADDED ---
+} from '../services/apiClient';
+import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorMessage from '../components/ErrorMessage';
+import GraphDisplay from '../components/GraphDisplay';
+import { Node, Edge } from 'reactflow';
+import './DetailPage.css';
+
+// Helper function to render lists of linked items (unchanged)
+const renderLinkedItems = <T extends { id: number; display_name?: string | null; full_name?: string | null; title?: string | null }>(
+    title: string,
+    items: T[] | null | undefined,
+    linkPrefix: string,
+    isLoading: boolean,
+    error: string | null
+) => {
+    if (isLoading) return <div><LoadingSpinner /> Loading {title}...</div>;
+    if (error) return <ErrorMessage message={`Error loading ${title}: ${error}`} />;
+    if (!items || items.length === 0) return <div>No {title} found.</div>;
+
+    return (
+        <div>
+            <h4>{title} ({items.length})</h4>
+            <ul>
+                {items.map((item) => (
+                    <li key={item.id}>
+                        <Link to={`${linkPrefix}${item.id}`}>
+                            {item.display_name || item.full_name || item.title || `ID: ${item.id}`}
+                        </Link>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+};
+
+
+function WorkDetailPage() {
+    const { id } = useParams<{ id: string }>();
+    const workId = Number(id);
+
+    const [workData, setWorkData] = useState<WorkResponse | null>(null);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
+
+    // State for related items (unchanged)
+    const [repositories, setRepositories] = useState<RepositorySummary[] | null>(null);
+    const [citations, setCitations] = useState<WorkSummary[] | null>(null);
+    const [references, setReferences] = useState<WorkSummary[] | null>(null);
+    const [citingPeople, setCitingPeople] = useState<PersonSummary[] | null>(null);
+    const [citingInstitutions, setCitingInstitutions] = useState<InstitutionSummary[] | null>(null);
+
+    const [loadingRelated, setLoadingRelated] = useState<Record<string, boolean>>({
+        repositories: false, citations: false, references: false, citingPeople: false, citingInstitutions: false
+    });
+    const [errorRelated, setErrorRelated] = useState<Record<string, string | null>>({
+        repositories: null, citations: null, references: null, citingPeople: null, citingInstitutions: null
+    });
+
+    // State for graph (unchanged)
+    const [graphNodes, setGraphNodes] = useState<Node[]>([]);
+    const [graphEdges, setGraphEdges] = useState<Edge[]>([]);
+
+    // Helper functions for related data state (unchanged)
+    const setRelatedLoadState = (key: string, loading: boolean) => {
+        setLoadingRelated(prev => ({ ...prev, [key]: loading }));
+    };
+    const setRelatedErrorState = (key: string, errorMsg: string | null) => {
+        setErrorRelated(prev => ({ ...prev, [key]: errorMsg }));
+    };
+
+
+    // Fetch main work data (unchanged)
+    useEffect(() => {
+        if (!workId) {
+            setError("Invalid Work ID.");
+            setIsLoading(false);
+            return;
+        }
+        let isMounted = true; // Prevent state update on unmounted component
+        setIsLoading(true);
+        setError(null);
+        getWork(workId)
+            .then(data => {
+               if (isMounted) {
+                    setWorkData(data);
+                    // Initial graph node setup (unchanged)
+                    setGraphNodes([{ id: `work-${workId}`, data: { label: data.title || `Work ${workId}` }, position: { x: 250, y: 5 }, type: 'input' }]);
+                    setGraphEdges([]);
+               }
+            })
+            .catch(err => { if(isMounted) setError(handleApiError(err))}) // Use handleApiError
+            .finally(() => {if(isMounted) setIsLoading(false)});
+
+        return () => { isMounted = false }; // Cleanup function
+    }, [workId]);
+
+    // Fetch related data (unchanged)
+    useEffect(() => {
+        if (!workId) return;
+        let isMounted = true; // Prevent state update on unmounted component
+
+        const fetchRelated = async <T,>(
+            key: keyof typeof loadingRelated, // Use keyof for type safety
+            fetcher: () => Promise<T>,
+            setter: React.Dispatch<React.SetStateAction<T | null>>
+        ) => {
+            setRelatedLoadState(key, true);
+            setRelatedErrorState(key, null);
+            try {
+                const data = await fetcher();
+                if (isMounted) setter(data);
+            } catch (err) {
+                 if (isMounted) setRelatedErrorState(key, handleApiError(err));
+            } finally {
+                if (isMounted) setRelatedLoadState(key, false);
+            }
+        };
+
+        fetchRelated('repositories', () => getWorkRepositories(workId), setRepositories);
+        fetchRelated('citations', () => getWorkCitations(workId), setCitations);
+        fetchRelated('references', () => getWorkReferences(workId), setReferences);
+        fetchRelated('citingPeople', () => getWorkCitingPeople(workId), setCitingPeople);
+        fetchRelated('citingInstitutions', () => getWorkCitingInstitutions(workId), setCitingInstitutions);
+
+         return () => { isMounted = false }; // Cleanup function
+
+    }, [workId]); // Re-fetch related data if workId changes
+
+
+    // Update graph nodes and edges when related data loads (unchanged)
+    useEffect(() => {
+        if (!workData) return;
+
+        const newNodes: Node[] = [];
+        if (workId) {
+            newNodes.push({ id: `work-${workId}`, data: { label: workData.title || `Work ${workId}` }, position: { x: 250, y: 5 }, type: 'input' });
+        } else {
+             console.warn("Work ID missing when trying to build graph");
+             setGraphNodes([]);
+             setGraphEdges([]);
+             return;
+        }
+
+        const newEdges: Edge[] = [];
+        let yOffset = 150;
+        const xOffsetStep = 180;
+
+        const addNodesAndEdges = (
+            items: any[] | null | undefined,
+            type: string,
+            labelKey: string,
+            linkPrefix: string,
+            edgeLabel: string,
+            currentYOffset: number
+        ): number => {
+            if (items && items.length > 0) {
+                 items.slice(0, 10).forEach((item, index) => {
+                    const nodeId = `${type}-${item.id}`;
+                    newNodes.push({
+                        id: nodeId,
+                        data: { label: item[labelKey] || `${type} ${item.id}` },
+                        position: { x: index * xOffsetStep, y: currentYOffset }
+                    });
+                    newEdges.push({
+                        id: `e-work-${workId}-${type}-${item.id}`,
+                        source: `work-${workId}`,
+                        target: nodeId,
+                        label: edgeLabel,
+                        animated: type === 'citation' || type === 'reference'
+                    });
+                });
+                return currentYOffset + 150;
+            }
+            return currentYOffset;
+        };
+
+        yOffset = addNodesAndEdges(repositories, 'repo', 'full_name', '/repositories/', 'Referenced In', yOffset);
+        yOffset = addNodesAndEdges(citations, 'work', 'title', '/works/', 'Cited By', yOffset);
+        yOffset = addNodesAndEdges(references, 'work', 'title', '/works/', 'References', yOffset);
+
+        setGraphNodes(newNodes);
+        setGraphEdges(newEdges);
+
+    }, [workData, workId, repositories, citations, references]); // Dependencies for graph update
+
+
+    // --- MODIFIED: Render Topic Information ---
+    const renderTopicInfo = () => {
+        if (!workData) return null;
+        // Access the potentially null fields using optional chaining ?.
+        const primary = workData.primary_topic;
+        // Filter out the primary topic ID from the secondary list
+        const secondary = workData.topics?.filter(t => t.id !== primary?.id);
+
+        let primaryTopicString = "N/A";
+        if (primary) {
+            // Build the hierarchy string carefully, checking each level
+            const domainStr = primary.domain?.display_name ? ` / ${primary.domain.display_name} (Domain)` : "";
+            const fieldStr = primary.field?.display_name ? ` / ${primary.field.display_name} (Field)` : "";
+            const subfieldStr = primary.subfield?.display_name ? ` / ${primary.subfield.display_name} (Subfield)` : "";
+            const scoreStr = primary.score !== null && primary.score !== undefined ? ` (Score: ${primary.score.toFixed(3)})` : "";
+
+            primaryTopicString = `${primary.display_name} (Topic)${scoreStr}${subfieldStr}${fieldStr}${domainStr}`;
+        }
+
+        return (
+            <div className="detail-section">
+                <h3>Subject Information</h3>
+                <p><strong>Primary Topic:</strong> {primaryTopicString}</p>
+                {secondary && secondary.length > 0 && (
+                    <>
+                        <p><strong>Other Topics:</strong></p>
+                        <ul>
+                            {secondary.map(topic => (
+                                <li key={topic.id}>{topic.display_name}</li>
+                                // Potential: Add links to a future Topic detail page
+                            ))}
+                        </ul>
+                    </>
+                )}
+                {/* Show message only if *both* primary and secondary are absent */}
+                { !primary && (!secondary || secondary.length === 0) && (
+                     <p>No topic information available.</p>
+                )}
+            </div>
+        );
+    };
+     // --- END MODIFIED ---
+
+
+    if (isLoading) return <div className="detail-container"><LoadingSpinner /> Loading Work Details...</div>;
+    if (error) return <div className="detail-container"><ErrorMessage message={error} /></div>;
+    if (!workData) return <div className="detail-container"><ErrorMessage message="Work data could not be loaded." /></div>;
+
+
+    return (
+        <div className="detail-container">
+            <h2>Work: {workData.title || 'N/A'}</h2>
+            <div className="detail-grid">
+                {/* Left Column: Core Info */}
+                <div className="detail-section">
+                    <h3>Details</h3>
+                     <p><strong>ID:</strong> {workData.id}</p>
+                    <p><strong>OpenAlex ID:</strong> {workData.openalex_id || 'N/A'}</p>
+                    <p><strong>DOI:</strong> {workData.doi ? <a href={`https://doi.org/${workData.doi}`} target="_blank" rel="noopener noreferrer">{workData.doi}</a> : 'N/A'}</p>
+                    <p><strong>Publication Year:</strong> {workData.publication_year || 'N/A'}</p>
+                    <p><strong>Type:</strong> {workData.type || 'N/A'}</p>
+                    <p><strong>Cited By Count (OpenAlex):</strong> {workData.cited_by_count ?? 'N/A'}</p>
+                    <p><strong>Host Venue:</strong> {workData.host_venue_display_name || 'N/A'}</p>
+                    {workData.openalex_url && <p><a href={workData.openalex_url} target="_blank" rel="noopener noreferrer">View on OpenAlex</a></p>}
+                </div>
+
+                {/* --- ADDED Call to Render Topic Info --- */}
+                {renderTopicInfo()}
+                {/* --- END ADDED --- */}
+
+                {/* Right Column: Related Entities */}
+                <div>
+                    <div className="detail-section">
+                        {renderLinkedItems('Repositories Referencing This Work', repositories, '/repositories/', loadingRelated['repositories'], errorRelated['repositories'])}
+                    </div>
+                    <div className="detail-section">
+                        {renderLinkedItems('Works Cited By This Work (References)', references, '/works/', loadingRelated['references'], errorRelated['references'])}
+                    </div>
+                    <div className="detail-section">
+                        {renderLinkedItems('Works Citing This Work', citations, '/works/', loadingRelated['citations'], errorRelated['citations'])}
+                    </div>
+                    <div className="detail-section">
+                         {renderLinkedItems('People Citing This Work', citingPeople, '/persons/', loadingRelated['citingPeople'], errorRelated['citingPeople'])}
+                    </div>
+                     <div className="detail-section">
+                         {renderLinkedItems('Institutions Citing This Work', citingInstitutions, '/institutions/', loadingRelated['citingInstitutions'], errorRelated['citingInstitutions'])}
+                    </div>
+                </div>
+            </div>
+
+            {/* Graph Visualization (unchanged) */}
+            <div className="detail-section graph-section">
+                <h3>Relationship Graph</h3>
+                <GraphDisplay initialNodes={[]} initialEdges={[]} nodes={graphNodes} edges={graphEdges} />
+            </div>
+        </div>
+    );
+}
+
+export default WorkDetailPage;

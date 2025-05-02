@@ -1,0 +1,65 @@
+/* frontend\src\components\Layout.css */
+.app-layout {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    font-family: sans-serif;
+  }
+  
+  .app-header {
+    background-color: #282c34;
+    padding: 1rem 2rem;
+    color: white;
+  }
+  
+  .app-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .nav-logo {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #61dafb; /* React blue */
+      text-decoration: none;
+  }
+  
+  .nav-links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    gap: 1.5rem;
+  }
+  
+  .nav-links a {
+    color: white;
+    text-decoration: none;
+    font-size: 1rem;
+  }
+  
+  .nav-links a:hover,
+  .nav-links a:focus {
+    color: #61dafb;
+    text-decoration: underline;
+  }
+  
+  
+  .app-main-content {
+    flex-grow: 1; /* Takes up remaining vertical space */
+    padding: 2rem;
+    max-width: 1200px; /* Optional max width for content */
+    margin: 0 auto; /* Center content */
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  .app-footer {
+    background-color: #f8f9fa;
+    padding: 1rem 2rem;
+    text-align: center;
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-top: auto; /* Pushes footer to bottom */
+  }

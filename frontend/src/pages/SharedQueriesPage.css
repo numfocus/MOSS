@@ -1,0 +1,422 @@
+/* --- COMPLETE UPDATED FILE: frontend/src/pages/SharedQueriesPage.css --- */
+
+.shared-queries-page {
+  padding: 20px;
+  max-width: 900px;
+  margin: 20px auto;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  font-family: sans-serif; /* Basic font */
+}
+
+.shared-queries-page h2,
+.shared-queries-page h3,
+.shared-queries-page h4 {
+  color: #333;
+  margin-top: 1.5em;
+  margin-bottom: 0.8em;
+}
+.shared-queries-page h2:first-child {
+  margin-top: 0;
+}
+
+.shared-queries-page hr {
+  border: none;
+  border-top: 1px solid #eee;
+  margin: 25px 0;
+}
+
+/* --- Workflow & Sections --- */
+.workflow-mode-selection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap; /* Allow wrapping on small screens */
+  gap: 15px;
+  margin-bottom: 10px;
+}
+.workflow-mode-selection label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: bold;
+}
+.workflow-mode-selection input[type="checkbox"] {
+  margin-right: 8px;
+  transform: scale(1.1);
+}
+.switch-workflow-button {
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.switch-workflow-button:hover {
+  background-color: #5a6268;
+}
+
+.affiliation-workflow-section,
+.analysis-workflow-section {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+}
+
+.workflow-step {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px dashed #ddd;
+}
+.workflow-step:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* --- Forms & Inputs --- */
+.form-group {
+  margin-bottom: 15px;
+}
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #444;
+}
+.form-group select,
+.form-group input[type="text"],
+.form-group input[type="number"] {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1rem;
+  background-color: #fff;
+  box-sizing: border-box;
+}
+.form-group select:disabled {
+  background-color: #e9ecef;
+  cursor: not-allowed;
+}
+.form-group small {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.parameter-form {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #fdfdfd;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+.parameter-form.subsection-form {
+  margin-top: 10px;
+  padding-left: 0;
+  padding-right: 0;
+  border: none;
+  background: none;
+}
+
+.parameter-input-group {
+  margin-bottom: 15px;
+}
+.parameter-input-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #444;
+}
+.parameter-input-group label code {
+  font-size: 0.85em;
+  color: #007bff;
+  background-color: #e9f5ff;
+  padding: 2px 4px;
+  border-radius: 3px;
+  margin-left: 5px;
+}
+/* --- ADDED: Style for required indicator --- */
+.required-indicator {
+  color: red;
+  margin-left: 4px;
+  font-weight: bold;
+}
+
+.parameter-input-group input[type="text"],
+.parameter-input-group input[type="number"] { /* Add number later if needed */
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+/* --- Buttons --- */
+button {
+  padding: 10px 15px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s ease;
+}
+button:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+.proceed-button {
+  background-color: #28a745;
+}
+.proceed-button:hover:not(:disabled) {
+  background-color: #218838;
+}
+.small-button {
+  padding: 3px 6px;
+  font-size: 0.8rem;
+  margin-left: 5px;
+}
+.clear-button {
+  background-color: #dc3545;
+  margin-left: 10px;
+}
+.clear-button:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+/* --- Affiliation Specific --- */
+.institution-selector {
+  position: relative; /* For dropdown positioning */
+}
+.search-results-dropdown {
+  position: absolute;
+  background-color: white;
+  border: 1px solid #ccc;
+  border-top: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%; /* Match input width */
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 0 0 4px 4px;
+}
+.search-results-dropdown li {
+  padding: 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+}
+.search-results-dropdown li:last-child {
+  border-bottom: none;
+}
+.search-results-dropdown li:hover {
+  background-color: #f0f0f0;
+}
+.selected-institution-display {
+  display: inline-block;
+  margin-left: 10px;
+  font-weight: bold;
+  color: #333;
+}
+.context-hint {
+  margin-bottom: 15px;
+  font-size: 0.9em;
+  color: #555;
+}
+.results-display {
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+.results-display h5 {
+  margin-bottom: 10px;
+}
+.algorithm-execution {
+  margin-top: 20px;
+}
+.confidence-threshold {
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+.confidence-threshold label {
+  margin-bottom: 10px;
+}
+.confidence-threshold input[type="range"] {
+  width: 80%;
+  margin-right: 10px;
+  vertical-align: middle;
+}
+.confidence-threshold span {
+  font-weight: bold;
+  vertical-align: middle;
+}
+.execution-status {
+  margin-top: 10px;
+  padding: 8px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+.execution-status.success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+.execution-status.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* --- Results Area --- */
+.results-area,
+.results-container { /* Apply to both for consistency */
+  margin-top: 30px;
+  padding: 20px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background-color: #fff;
+  min-height: 50px; /* Ensure area is visible even when empty */
+}
+.results-area h4,
+.results-container h4 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #333;
+}
+.results-area p,
+.results-container p {
+  margin-bottom: 10px;
+}
+
+/* Styles for different result types */
+.result-value pre,
+.result-plot-data pre, /* Kept for potential future use */
+.result-unknown pre {
+  background-color: #eef;
+  padding: 15px; /* Slightly more padding */
+  border-radius: 4px;
+  border: 1px solid #dde;
+  white-space: pre-wrap; /* Allow wrapping */
+  word-break: break-word; /* Nicer word breaking */
+  max-height: 450px; /* Slightly taller */
+  overflow-y: auto;
+  font-family: monospace; /* Use monospace font */
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+/* Simple Table styles assumed to be handled by SimpleTable.css */
+
+/* Loading Spinner / Error Message styles assumed handled by their components */
+
+/* Help text style */
+.help-text {
+  color: #6c757d;
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+/* --- Styles for Dynamic List Parameters --- */
+.list-parameter-group {
+  margin-bottom: 1rem; /* Add some space below the group */
+}
+
+.list-parameter-group label {
+  display: block; /* Make label take full width */
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+.list-parameter-group label code {
+   font-weight: normal;
+}
+
+.list-parameter-group label small {
+  font-weight: normal;
+  color: #555;
+  display: block; /* Description on new line */
+  font-size: 0.9em;
+}
+
+.list-parameter-group .list-items-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem; /* Space between list items */
+  margin-bottom: 0.5rem; /* Space before the "Add" button */
+  padding-left: 0.5rem; /* Indent items slightly */
+  border-left: 2px solid #eee; /* Visual cue for list items */
+}
+
+.list-parameter-group .list-item-input {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem; /* Space between input and remove button */
+}
+
+.list-parameter-group .list-item-text-input {
+  flex-grow: 1; /* Allow input to take available space */
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.95em;
+}
+
+/* Style the remove button */
+.list-parameter-group .remove-item-button {
+  padding: 0.1rem 0.5rem; /* Make it compact */
+  line-height: 1;
+  font-size: 1.2em; /* Make the 'x' slightly larger */
+  font-weight: bold;
+  color: #dc3545; /* Red color for removal */
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 50%; /* Make it round */
+  flex-shrink: 0; /* Prevent button from shrinking */
+}
+.list-parameter-group .remove-item-button:hover {
+  background-color: #f8d7da; /* Light red background on hover */
+  color: #721c24;
+}
+
+/* Style the add button */
+.list-parameter-group .add-item-button {
+   padding: 0.3rem 0.8rem;
+   margin-top: 0.2rem;
+   background-color: #e2e6ea;
+   border: 1px solid #dae0e5;
+   color: #333;
+   cursor: pointer;
+   border-radius: 4px;
+   font-size: 0.9em;
+   margin-left: 0.5rem; /* Align with indented items */
+}
+.list-parameter-group .add-item-button:hover {
+   background-color: #d6dbdf;
+}
+
+/* Style for validation hints */
+.list-parameter-group .small-text {
+  font-size: 0.8em;
+  margin-top: 0.2rem;
+  margin-left: 0.5rem; /* Align with items */
+}
+
+.list-parameter-group .error-message.small-text {
+  color: #dc3545; /* Bootstrap danger color */
+}

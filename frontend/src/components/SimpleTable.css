@@ -1,0 +1,47 @@
+/* --- NEW FILE: frontend/src/components/SimpleTable.css --- */
+
+.simple-table-container {
+    overflow-x: auto; /* Allow horizontal scrolling for wide tables */
+    margin-top: 1em;
+    max-width: 100%;
+  }
+  
+  .simple-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #ddd;
+    font-size: 0.9rem;
+    background-color: #fff;
+  }
+  
+  .simple-table th,
+  .simple-table td {
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top; /* Align content to top */
+  }
+  
+  .simple-table th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+    color: #333;
+    position: sticky; /* Make header sticky if container scrolls */
+    top: 0;
+    z-index: 1;
+  }
+  
+  .simple-table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
+  
+  .simple-table tbody tr:hover {
+    background-color: #f1f1f1;
+  }
+  
+  .simple-table td pre { /* Style for stringified JSON */
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin: 0;
+      font-size: 0.85em;
+  }

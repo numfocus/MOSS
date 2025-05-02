@@ -1,0 +1,191 @@
+// --- CORRECTED FILE: frontend/src/pages/InstitutionDetailPage.tsx ---
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import {
+    getInstitution,
+    getInstitutionRepositories,
+    getInstitutionAffiliationsFiltered, // Correct name from previous fix
+} from '../services/apiClient';
+import LoadingSpinner, { LoadingSpinnerProps } from '../components/LoadingSpinner'; // Import props if needed
+import ErrorMessage, { ErrorMessageProps } from '../components/ErrorMessage'; // Import props if needed
+import SimpleTable, { SimpleTableProps } from '../components/SimpleTable'; // Import props type
+import type {
+    InstitutionResponse,
+    RepositorySummary,
+    AffiliationResultResponse,
+} from '../services/apiClient';
+import './DetailPage.css';
+
+// State types
+interface LinkedReposState { repos: RepositorySummary[]; loading: boolean; error: string | null; }
+interface AffiliationsState { affiliations: AffiliationResultResponse[]; loading: boolean; error: string | null; }
+
+const InstitutionDetailPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const institutionId = parseInt(id ?? '0', 10);
+
+  const [institution, setInstitution] = useState<InstitutionResponse | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [linkedRepos, setLinkedRepos] = useState<LinkedReposState>({ repos: [], loading: false, error: null });
+  const [affiliations, setAffiliations] = useState<AffiliationsState>({ affiliations: [], loading: false, error: null });
+
+
+  // Fetch related data functions
+  const fetchLinkedRepositories = useCallback(async (instId: number) => {
+        setLinkedRepos({ repos: [], loading: true, error: null });
+        try {
+            const repoData = await getInstitutionRepositories(instId);
+            setLinkedRepos({ repos: repoData, loading: false, error: null });
+        } catch (err: any) {
+            setLinkedRepos({ repos: [], loading: false, error: err.message || 'Failed to fetch linked repositories.' });
+        }
+    }, []);
+
+  const fetchAffiliationData = useCallback(async (instId: number) => {
+      setAffiliations({ affiliations: [], loading: true, error: null });
+      try {
+          const data = await getInstitutionAffiliationsFiltered(instId);
+          setAffiliations({ affiliations: data, loading: false, error: null });
+      } catch (err: any) {
+          setAffiliations({ affiliations: [], loading: false, error: err.message || 'Failed to fetch affiliations.' });
+      }
+  }, []);
+
+
+  // Fetch initial institution data and trigger related data fetches
+  useEffect(() => {
+    if (!institutionId || isNaN(institutionId) || institutionId <= 0) {
+         setError('Institution ID is missing or invalid.');
+         setLoading(false);
+         return;
+    }
+    const fetchInstitution = async () => {
+       setLoading(true);
+       setError(null);
+       setLinkedRepos({ repos: [], loading: false, error: null });
+       setAffiliations({ affiliations: [], loading: false, error: null });
+
+      try {
+        const data = await getInstitution(institutionId);
+        setInstitution(data);
+        fetchLinkedRepositories(institutionId);
+        fetchAffiliationData(institutionId);
+      } catch (err: any) {
+        setError(err.message || 'Failed to fetch institution details.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInstitution();
+  }, [institutionId, fetchLinkedRepositories, fetchAffiliationData]);
+
+
+  // --- Render Helper Functions ---
+    // Helper to render linked items (Repositories)
+    const renderLinkedItems = (
+        title: string,
+        state: LinkedReposState,
+        linkPrefix: string,
+        emptyMessage: string
+    ) => {
+        // Define props for LoadingSpinner and ErrorMessage if they accept them
+        const loadingProps: LoadingSpinnerProps = {}; // Add message prop if needed: { message: 'Loading...' }
+        const errorProps = (msg: string): ErrorMessageProps => ({ message: msg });
+
+        return (
+            <div className="detail-section">
+                <h4>{title}</h4>
+                {state.loading && <LoadingSpinner {...loadingProps} />}
+                {state.error && <ErrorMessage {...errorProps(state.error)} />}
+                {!state.loading && !state.error && state.repos.length > 0 && (
+                    <ul>
+                        {state.repos.map(item => (
+                            <li key={item.id}>
+                                <Link to={`${linkPrefix}${item.id}`}> {/* Corrected Link usage */}
+                                    {item.full_name || `ID ${item.id}`}
+                                </Link>
+                                {item.language && ` (${item.language})`}
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                {!state.loading && !state.error && state.repos.length === 0 && <p>{emptyMessage}</p>}
+            </div>
+        );
+    };
+
+    // Helper to render affiliations table
+     const renderAffiliationsList = (
+        state: AffiliationsState
+    ) => {
+        // Define props for LoadingSpinner and ErrorMessage
+        const loadingProps: LoadingSpinnerProps = {};
+        const errorProps = (msg: string): ErrorMessageProps => ({ message: msg });
+
+        if (state.loading) return <div className="detail-section"><h4>Calculated Repository Affiliations</h4><LoadingSpinner {...loadingProps} /></div>;
+        if (state.error) return <div className="detail-section"><h4>Calculated Repository Affiliations</h4><ErrorMessage {...errorProps(state.error)} /></div>;
+        if (state.affiliations.length === 0) return <div className="detail-section"><h4>Calculated Repository Affiliations</h4><p>No calculated affiliations found.</p></div>;
+
+        const tableData = state.affiliations.map(aff => ({
+            repository: <Link to={`/repositories/${aff.repository_id}`}>{aff.repository_name}</Link>,
+            confidence: aff.confidence_score.toFixed(3),
+            algorithm: `${aff.algorithm_name} v${aff.algorithm_version}`,
+            calculated_at: new Date(aff.calculated_at).toLocaleDateString(),
+        }));
+        const headers = ['Repository', 'Confidence', 'Algorithm', 'Calculated At'];
+
+        // Define props for SimpleTable
+        const tableProps: SimpleTableProps = { headers, data: tableData };
+
+        return (
+            <div className="detail-section">
+                <h4>Calculated Repository Affiliations</h4>
+                {/* --- CORRECTED: Pass props object --- */}
+                <SimpleTable {...tableProps} />
+                {/* --- END CORRECTION --- */}
+            </div>
+         );
+    };
+
+
+  // --- Main Render ---
+  if (loading && !institution) return <div className="detail-container"><LoadingSpinner /></div>; // Use default props
+  if (error && !institution) return <div className="detail-container"><ErrorMessage message={error} /></div>; // Use default props
+  if (!institution) return <div className="detail-container"><p>Institution not found or ID is invalid.</p></div>;
+
+  return (
+    <div className="detail-container institution-detail">
+      <h2>Institution: {institution.display_name}</h2>
+       <div className="detail-section">
+           <h3>Details</h3>
+           <p><strong>ID:</strong> {institution.id}</p>
+           <p><strong>OpenAlex ID:</strong> <a href={`https://openalex.org/${institution.openalex_id}`} target="_blank" rel="noopener noreferrer">{institution.openalex_id}</a></p>
+           <p><strong>ROR:</strong> {institution.ror ? <a href={`https://ror.org/${institution.ror}`} target="_blank" rel="noopener noreferrer">{institution.ror}</a> : 'N/A'}</p>
+           <p><strong>Type:</strong> {institution.type || 'N/A'}</p>
+           <p><strong>Country Code:</strong> {institution.country_code || 'N/A'}</p>
+           {institution.github_organization_logins && institution.github_organization_logins.length > 0 && (
+                <p><strong>Potential GitHub Orgs:</strong> {institution.github_organization_logins.join(', ')}</p>
+           )}
+           <p><small>Created in MOSS: {new Date(institution.created_at).toLocaleString()}</small></p>
+           <p><small>Updated in MOSS: {new Date(institution.updated_at).toLocaleString()}</small></p>
+       </div>
+
+      <hr />
+
+        {renderLinkedItems(
+           "Linked Repositories (via Works)",
+           linkedRepos, // Pass the state object
+           "/repositories", // Ensure prefix has trailing slash if needed
+           "No repositories found linked via works."
+       )}
+
+       {renderAffiliationsList(affiliations)} {/* Pass the state object */}
+
+    </div>
+  );
+};
+
+export default InstitutionDetailPage;

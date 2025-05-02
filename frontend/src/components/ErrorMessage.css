@@ -1,0 +1,21 @@
+/* frontend\src\components\ErrorMessage.css */
+.error-message {
+    border: 1px solid #dc3545; /* Red border */
+    background-color: #f8d7da; /* Light red background */
+    color: #721c24; /* Dark red text */
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 4px;
+  }
+  
+  .error-message p {
+      margin: 0 0 0.5rem 0;
+      font-weight: bold;
+  }
+  
+  .error-message pre {
+      white-space: pre-wrap; /* Wrap long error messages */
+      word-wrap: break-word;
+      margin: 0;
+      font-size: 0.9em;
+  }
