@@ -82,3 +82,57 @@
     color: #666;
     font-style: italic;
 }
+
+/* Institution type styling */
+.institution-type {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+    margin-left: 6px;
+}
+
+.institution-type-icon {
+    margin-right: 5px;
+}
+
+.institution-type-education {
+    background-color: #e3f2fd;
+    color: #0d47a1;
+}
+
+.institution-type-healthcare {
+    background-color: #e8f5e9;
+    color: #1b5e20;
+}
+
+.institution-type-company {
+    background-color: #fce4ec;
+    color: #880e4f;
+}
+
+.institution-type-archive {
+    background-color: #fff3e0;
+    color: #e65100;
+}
+
+.institution-type-nonprofit {
+    background-color: #f3e5f5;
+    color: #4a148c;
+}
+
+.institution-type-government {
+    background-color: #e8eaf6;
+    color: #1a237e;
+}
+
+.institution-type-facility {
+    background-color: #e0f7fa;
+    color: #006064;
+}
+
+.institution-type-other, .institution-type-unknown {
+    background-color: #f5f5f5;
+    color: #616161;
+}
