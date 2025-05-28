@@ -16,6 +16,9 @@ import ErrorMessage from '../components/ErrorMessage';
 // Import page-specific styles
 import './SearchPage.css';
 
+// Import the InstitutionType component
+import InstitutionType from '../components/InstitutionType';
+
 /**
  * Interface defining the structure for storing search results across different entity types.
  * Each property holds an array of summary objects for that entity type.
@@ -261,6 +264,7 @@ function SearchPage() {
                                         <Link to={`/institutions/${inst.id}`}>{inst.display_name}</Link>
                                          {/* Optionally display ROR ID */}
                                         {inst.ror && ` (ROR: ${inst.ror})`}
+                                        {inst.type && <InstitutionType type={inst.type} showIcon={true} />}
                                     </li>
                                 ))}
                             </ul>

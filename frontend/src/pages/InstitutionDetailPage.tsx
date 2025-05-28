@@ -9,6 +9,7 @@ import {
 import LoadingSpinner, { LoadingSpinnerProps } from '../components/LoadingSpinner'; // Import props type for explicit prop passing
 import ErrorMessage, { ErrorMessageProps } from '../components/ErrorMessage'; // Import props type for explicit prop passing
 import SimpleTable, { SimpleTableProps } from '../components/SimpleTable'; // Import props type for explicit prop passing
+import InstitutionType from '../components/InstitutionType'; // Import the new InstitutionType component
 import type {
     InstitutionResponse,
     RepositorySummary,
@@ -26,8 +27,8 @@ interface LinkedReposState {
     error: string | null;
 }
 
-/** Defines the structure for storing the state related to calculated affiliations,
- * including the affiliation data array, loading status, and any potential error message. */
+/** Defines the structure for storing the state related to institution affiliations,
+ * including the affiliations data array, loading status, and any potential error message. */
 interface AffiliationsState {
     affiliations: AffiliationResultResponse[];
     loading: boolean;
@@ -280,7 +281,7 @@ const InstitutionDetailPage: React.FC = () => {
            <p><strong>OpenAlex ID:</strong> <a href={`https://openalex.org/${institution.openalex_id}`} target="_blank" rel="noopener noreferrer">{institution.openalex_id}</a></p>
            {/* Link to external ROR page if ROR ID exists */}
            <p><strong>ROR:</strong> {institution.ror ? <a href={`https://ror.org/${institution.ror}`} target="_blank" rel="noopener noreferrer">{institution.ror}</a> : 'N/A'}</p>
-           <p><strong>Type:</strong> {institution.type || 'N/A'}</p>
+           <p><strong>Type:</strong> <InstitutionType type={institution.type} /></p>
            <p><strong>Country Code:</strong> {institution.country_code || 'N/A'}</p>
            {/* Display potential GitHub org logins if available */}
            {institution.github_organization_logins && institution.github_organization_logins.length > 0 && (

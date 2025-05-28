@@ -1,0 +1,41 @@
+.institution-type-filter {
+  margin: 16px 0;
+}
+
+.institution-type-filter h4 {
+  margin-bottom: 8px;
+}
+
+.institution-type-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.institution-type-filter-item {
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 4px;
+  background-color: #f5f5f5;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  user-select: none;
+}
+
+.institution-type-filter-item:hover {
+  background-color: #e0e0e0;
+}
+
+.institution-type-filter-item.selected {
+  background-color: #e3f2fd;
+  border: 1px solid #2196f3;
+}
+
+/* Override the default institution type styling within filter items */
+.institution-type-filter-item .institution-type {
+  background-color: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+} 
