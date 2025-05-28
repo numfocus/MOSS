@@ -33,7 +33,7 @@ If you find a bug or have a feature request, please create an issue by following
    - **Description**: Include a detailed description of your changes, the motivation behind them, and any related issues.
 3. **Review Process**:
    - **Automatic Checks**: Your PR will undergo automated checks.
-   - **Review by Maintainers**: Your PR will be reviewed by the maintainers. They may request changes or provide feedback.
+   - **Review by Maintainers**: Your PR will be reviewed by the maintainers. They may request changes or provide feedback. Note: we require at least one review approval from a maintainer in order for the pull request to be merged.
 
 ### Code of Conduct
 
