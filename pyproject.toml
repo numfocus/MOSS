@@ -1,0 +1,20 @@
+[project]
+name = "moss"
+version = "0.1.0"
+description = "MOSS (Map of Open Source Science) is a backend application designed to build a knowledge graph about open source scientific software"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "alembic>=1.16.1",
+    "celery>=5.5.3",
+    "concurrent-log-handler>=0.9.26",
+    "fastapi>=0.115.12",
+    "networkx>=3.5",
+    "psycopg2-binary>=2.9.10",
+    "python-dotenv>=1.1.0",
+    "python-louvain>=0.16",
+    "redis>=6.2.0",
+    "requests>=2.32.3",
+    "sqlalchemy>=2.0.41",
+    "uvicorn>=0.34.3",
+]

@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: moss_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-moss_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your_secure_password}
+      POSTGRES_DB: ${POSTGRES_DB:-moss_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - moss_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: moss_redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - moss_redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  moss_postgres_data:
+  moss_redis_data:
+

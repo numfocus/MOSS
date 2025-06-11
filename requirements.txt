@@ -1,5 +1,3 @@
-# --- UPDATED FILE: requirements.txt ---
-
 # Configuration
 python-dotenv
 
