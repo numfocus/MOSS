@@ -4,9 +4,7 @@
 
 ## Overview
 
-Map of Open Source Science (MOSS) is an open-source application and collaborative effort to model and map the domain of open-source research software and it's intersection with academia and scientific publication. It aims to construct a knowledge graph system and reproducible framework for modeling public repositories, academic publications, and the contributing entities and relationships between them. This is accomplished by structured integration of data obtained through overlapping web traversal and graph construction strategies, grounded on existing schema and ontologies such as using context driven rules such as direct or mentioned DOI linking (`<a>https://doi.org/10.1000/100</a>` vs `<p>https://doi.org/10.1000/100</p>`), and care is taken to conform to existing schema based systems (OpenAlex topics, Schema.org entities)
-
-The Map of Open Source Science (MOSS) is a platform that reveals the hidden connections between research software and academic scholarship. It builds a rich knowledge graph of the research ecosystem by ingesting data about software repositories, scholarly publications, researchers, and institutions. By linking these entities, MOSS helps answer critical questions about the impact, sustainability, and collaborative nature of open source in science.
+The Map of Open Source Science (MOSS) is an open-source application and collaborative effort to model and map the domain of open-source research software and its intersection with academic scholarship. It aims to reveal the hidden connections within this ecosystem by constructing a rich knowledge graph that links software repositories, scholarly publications, researchers, and institutions. This is accomplished through a reproducible framework that uses structured data integration, overlapping web traversal, and graph construction strategies. The system is grounded in existing ontologies (e.g., OpenAlex topics, Schema.org entities) and uses context-driven rules to establish relationships, ensuring data provenance and consistency. By making these connections visible, MOSS helps answer critical questions about the impact, sustainability, and collaborative nature of open source in science.
 
 This repository contains the backend services, API, and frontend application for the MOSS platform. It provides the tools to ingest data from sources like GitHub and OpenAlex, store it in a structured database, and expose it for analysis and exploration.
 
@@ -50,12 +48,9 @@ This repository contains the backend services, API, and frontend application for
 
  Before you begin, ensure you have the following installed on your system:
 
- 1. **uv:** Python package manager | [uv - Installation](https://docs.astral.sh/uv/getting-started/installation/)
- 2. **pnpm:** Node package manager | [pnpm - Installation](https://pnpm.io/installation)
- 3a. **Docker and Docker Compose:** (Recommended for simplified setup of PostgreSQL and Redis). Install Docker and Docker Compose.
- 3b. **Alternatively, for manual setup of services:**
-    * **PostgreSQL:** Version 12+
-    * **Redis:** Version 6+
+ 1. **uv:** Python package manager | [uv - Install](https://docs.astral.sh/uv/getting-started/installation/)
+ 2. **pnpm:** Node package manager | [pnpm - Install](https://pnpm.io/installation)
+ 3. **Docker:** Containerization platform | [Docker - Install](https://docs.docker.com/engine/install/) (Recommended for simplified setup of PostgreSQL and Redis)
 
 ## Setup
 
@@ -68,8 +63,8 @@ This repository contains the backend services, API, and frontend application for
 
     * **Edit `.env` and add your GitHub Token.** This is the only variable you need to change to get started.
     * `GITHUB_API_TOKEN`: Your GitHub Personal Access Token (PAT).
-      * Generate one at: <https://github.com/settings/tokens> (use "Tokens classic").
-      * Grant the `public_repo` scope for read-only access to public repositories.
+      * Generate one at: <https://github.com/settings/personal-access-tokens>
+      * Select the "Public repositories" option for repository access
 
 2. **Start Background Services:**
     This command starts PostgreSQL and Redis using Docker Compose.
@@ -100,7 +95,7 @@ This repository contains the backend services, API, and frontend application for
 
 ## Manual Setup & Configuration
 
-### Manual Python Environment Setup
+### Python Environment Setup
 
 This project uses `poethepoet` for task automation, which simplifies the setup process. The recommended setup above is the easiest path. If you wish to run commands manually, you can inspect the tasks defined in `pyproject.toml` under `[tool.poe.tasks]`.
 
@@ -150,7 +145,7 @@ The manual steps are:
       pnpm --dir frontend dev
       ```
 
-### Manual Service Setup (PostgreSQL & Redis)
+### Service Setup (PostgreSQL & Redis)
 
 If you are not using Docker, ensure PostgreSQL and Redis are installed and running, then:
 
@@ -176,7 +171,7 @@ The `.env` file is crucial for configuring the application. Here is a detailed b
 * **`OPENALEX_EMAIL`**: **(Recommended)** Your email address for the OpenAlex API "polite pool" to get better rate limits.
 * **`VITE_API_BASE_URL`**: The base URL for the backend API, used by the frontend.
 
-## Manual Database Migrations
+## Database Migrations
 
 If you make changes to the database models (`backend/data/models/`) later, you will need to:
 
