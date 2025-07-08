@@ -1,3 +1,16 @@
+#
+# MOSS - Background Services
+#
+# This file defines the background services required for the MOSS application,
+# which are managed by Docker Compose. It sets up PostgreSQL for the database
+# and Redis to serve as the Celery message broker and result backend.
+#
+# Environment variables are sourced from the `.env` file.
+#
+# Usage:
+#   - Start services: `docker compose up -d`
+#   - Stop services:  `docker compose down`
+#
 services:
   postgres:
     image: postgres:16
