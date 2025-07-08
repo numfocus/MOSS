@@ -4,17 +4,52 @@ version = "0.1.0"
 description = "MOSS (Map of Open Source Science) is a backend application designed to build a knowledge graph about open source scientific software"
 readme = "README.md"
 requires-python = ">=3.13"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "The MOSS Authors", email = "jon@numfocus.org" },
+]
+keywords = ["knowledge-graph", "open-source", "research software", "science", "github", "openalex"]
 dependencies = [
     "alembic>=1.16.1",
-    "celery>=5.5.3",
+    "celery[redis]>=5.5.3",
     "concurrent-log-handler>=0.9.26",
     "fastapi>=0.115.12",
-    "networkx>=3.5",
     "psycopg2-binary>=2.9.10",
     "python-dotenv>=1.1.0",
-    "python-louvain>=0.16",
-    "redis>=6.2.0",
     "requests>=2.32.3",
     "sqlalchemy>=2.0.41",
     "uvicorn>=0.34.3",
 ]
+
+[project.urls]
+Homepage = "https://www.opensource.science"
+Repository = "https://github.com/numfocus/MOSS"
+"Bug Tracker" = "https://github.com/numfocus/MOSS/issues"
+
+[dependency-groups]
+dev = [
+    "poethepoet>=0.36.0",
+]
+analysis = [
+    "networkx>=3.5",
+    "python-louvain>=0.16",
+]
+
+[tool.poe.tasks]
+# --- Setup Tasks ---
+setup-db = { cmd = "uv run python scripts/setup_db.py", help = "Run database migrations to set up the schema." }
+install-frontend = { cmd = "pnpm --dir frontend install", help = "Install frontend dependencies." }
+setup = { sequence = ["install-frontend", "setup-db"], help = "Set up the database and install frontend dependencies." }
+
+# --- Individual Services ---
+api = { cmd = "uv run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000", help = "Run the FastAPI API server." }
+worker = { cmd = "uv run celery -A backend.celery_app worker -l info", help = "Run the Celery background worker." }
+frontend = { cmd = "pnpm --dir frontend dev", help = "Run the frontend development server." }
+
+# --- Concurrent Development Server ---
+start = { shell = """
+uv run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000 &
+uv run celery -A backend.celery_app worker -l info &
+pnpm --dir frontend dev &
+wait
+""", help = "Run the API, worker, and frontend concurrently for development." }

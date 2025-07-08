@@ -12,7 +12,7 @@ import axios, { AxiosError } from 'axios';
 // --- Axios Client Configuration ---
 
 /** Base URL for the MOSS API. Reads from environment variable VITE_API_BASE_URL or defaults to /api/v1. */
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://0.0.0.0:8000/api/v1';
 
 /** Configured Axios instance for API requests. */
 const apiClient = axios.create({

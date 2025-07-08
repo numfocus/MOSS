@@ -4,31 +4,30 @@
 
 ## Overview
 
-MOSS (Map of Open Source Science) is a backend application designed to build a knowledge graph about open source scientific software. It ingests data about repositories (primarily from GitHub), links them to scholarly works (using DOIs and OpenAlex), identifies contributors and institutions, and provides an API to query these relationships. It also supports running custom analysis and discovery algorithms ("recipes").
+Map of Open Source Science (MOSS) is an open-source application and collaborative effort to model and map the domain of open-source research software and it's intersection with academia and scientific publication. It aims to construct a knowledge graph system and reproducible framework for modeling public repositories, academic publications, and the contributing entities and relationships between them. This is accomplished by structured integration of data obtained through overlapping web traversal and graph construction strategies, grounded on existing schema and ontologies such as using context driven rules such as direct or mentioned DOI linking (`<a>https://doi.org/10.1000/100</a>` vs `<p>https://doi.org/10.1000/100</p>`), and care is taken to conform to existing schema based systems (OpenAlex topics, Schema.org entities)
 
-The system uses a FastAPI web framework for its API, PostgreSQL as the database, Celery for background task processing (like keyword-based discovery and DOI processing), and Redis as the message broker for Celery.
+The Map of Open Source Science (MOSS) is a platform that reveals the hidden connections between research software and academic scholarship. It builds a rich knowledge graph of the research ecosystem by ingesting data about software repositories, scholarly publications, researchers, and institutions. By linking these entities, MOSS helps answer critical questions about the impact, sustainability, and collaborative nature of open source in science.
+
+This repository contains the backend services, API, and frontend application for the MOSS platform. It provides the tools to ingest data from sources like GitHub and OpenAlex, store it in a structured database, and expose it for analysis and exploration.
 
 ## Key Features
 
 * **Data Ingestion:**
-  * Ingest GitHub repositories via direct URL.
-  * Discover and ingest repositories based on keyword searches (asynchronous).
+  * **Repository Ingestion:** Ingest GitHub repositories directly via URL, asynchronously as workers with keyword searches, or discover through connection traversal
 * **Scholarly Linking:**
-  * Extracts DOIs from repository files (e.g., README).
-  * Resolves DOIs and fetches metadata from OpenAlex.
-  * Processes citation networks (references and citations).
+  * **DOI Extraction:** Automatically extracts DOIs from repository files like `README.md` and `CITATION.cff`.
+  * **Publication Mapping:** Resolves DOIs using the OpenAlex API to fetch detailed publication metadata.
+  * **Citation Traversal:** Recursively processes citation networks (references and citations) to build a deeper graph.
 * **Entity Tracking:**
-  * Stores detailed information about Repositories, Owners (Users/Orgs), Contributors.
-  * Stores Scholarly Works, Persons (Authors), Institutions.
-  * Tracks affiliations between authors and institutions.
-  * Tracks dependencies listed in common package files (`requirements.txt`, `package.json`).
-  * Tracks GitHub Issues, Pull Requests, and associated comments.
-* **Provenance:** Uses a `DiscoveryChain` system to track how data was found and linked.
-* **Extensibility:** Supports custom "recipes" for:
-  * Affiliation detection between repositories and institutions.
-  * Data analysis queries.
-  * Repository discovery algorithms.
-* **API:** Provides a RESTful API (built with FastAPI) for interacting with the ingested data and triggering processes.
+  * **Comprehensive Modeling:** Stores detailed information for repositories, repository owners (users/organizations), contributors, scholarly works, authors, and institutions.
+  * **Relationship Tracking:** Models affiliations between authors and institutions, and dependencies from common package manager files (e.g., `requirements.txt`, `package.json`).
+* **Data Provenance:**
+  * **Discovery Chains:** A robust `DiscoveryChain` system tracks the origin of every piece of data, recording how it was discovered and linked. This ensures transparency and reproducibility.
+* **Asynchronous Processing:**
+  * **Background Tasks:** Leverages Celery and Redis to handle long-running processes like repository discovery and citation traversal without blocking the API.
+* **Modern API:**
+  * **FastAPI Backend:** A high-performance RESTful API provides endpoints for triggering ingestion and querying the knowledge graph.
+  * **Interactive Docs:** Automatic API documentation is available via Swagger UI and ReDoc.
 
 ## Technology Stack
 
@@ -51,228 +50,133 @@ The system uses a FastAPI web framework for its API, PostgreSQL as the database,
 
  Before you begin, ensure you have the following installed on your system:
 
- 1. **Python:** Version 3.13 or higher. [Download Python](https://www.python.org/downloads/)
- 2. **uv:** Python's package installer. [uv - Installation](https://docs.astral.sh/uv/getting-started/installation/)
- 3. **Git:** For cloning the repository. [Download Git](https://git-scm.com/downloads)
- 4. **Node.js and pnpm:** For the frontend. Download Node.js (LTS recommended). pnpm can be installed via various methods. pnpm - Installation
- 5. **Docker and Docker Compose:** (Recommended for simplified setup of PostgreSQL and Redis). Install Docker and Docker Compose.
- 6. **Alternatively, for manual setup of services:**
-    * **PostgreSQL:** Version 12+ recommended. Download PostgreSQL
-    * **Redis:** Download Redis
+ 1. **uv:** Python package manager | [uv - Installation](https://docs.astral.sh/uv/getting-started/installation/)
+ 2. **pnpm:** Node package manager | [pnpm - Installation](https://pnpm.io/installation)
+ 3a. **Docker and Docker Compose:** (Recommended for simplified setup of PostgreSQL and Redis). Install Docker and Docker Compose.
+ 3b. **Alternatively, for manual setup of services:**
+    * **PostgreSQL:** Version 12+
+    * **Redis:** Version 6+
 
-## Setup Instructions
+## Setup
 
-Follow these steps carefully to set up the MOSS backend application:
-
-1. **Clone the Repository:**
-    Open your terminal or command prompt and run:
+1. **Configure Environment:**
+    * Copy `.env.example` to `.env` and add your `GITHUB_API_TOKEN`. This is the only variable you need to change to get started.
 
     ```sh
-    git clone https://github.com/numfocus/MOSS/
-    cd MOSS/
+    cp .env.example .env
     ```
 
-2. **Install uv**
-    As described here: [uv - Installation](https://docs.astral.sh/uv/getting-started/installation/)
+    * **Edit `.env` and add your GitHub Token.** This is the only variable you need to change to get started.
+    * `GITHUB_API_TOKEN`: Your GitHub Personal Access Token (PAT).
+      * Generate one at: <https://github.com/settings/tokens> (use "Tokens classic").
+      * Grant the `public_repo` scope for read-only access to public repositories.
+
+2. **Start Background Services:**
+    This command starts PostgreSQL and Redis using Docker Compose.
 
     ```sh
-    curl -LsSf https://astral.sh/uv/install.sh | sh
+    docker compose up -d
     ```
 
-    ```pwsh
-    winget install --id=astral-sh.uv  -e
-    ```
-
-3. **Install pnpm**
-    As described here: [pnpm - Installation](https://pnpm.io/installation)
+3. **Set up the Database & Frontend:**
+    * This command, powered by `poethepoet`, runs database migrations and installs all frontend dependencies. It uses `uv run` to execute `poe` from the virtual environment without needing to activate it.
 
     ```sh
-    curl -fsSL https://get.pnpm.io/install.sh | sh -
+    uv run poe setup
     ```
 
-    ```pwsh
-    winget install -e --id pnpm.pnpm
-    ```
-
-4. **Create a Virtual Environment**:
-    Use uv to install setup virtual environment.
+4. **Run the Application:**
+    * This single command starts the API server, Celery worker, and frontend development server concurrently in one terminal.
 
     ```sh
-    uv python install 3.13 # Install python 
-    uv venv # create virtual environment in current folder
+    uv run poe start
     ```
 
-5. **Activate the Virtual Environment:**
-    * **On macOS/Linux:**
+    * To stop all services, press `Ctrl+C`.
 
-        ```sh
-        source .venv/bin/activate
-        ```
+5. **Access the Application:**
+    * The API documentation will be available at `http://localhost:8000/docs`.
+    * The frontend will be available at the URL provided by the `pnpm dev` command (usually `http://localhost:5173`).
 
-    * **On Windows:**
+## Manual Setup & Configuration
 
-        ```pwsh
-        venv\Scripts\activate.bat
-        ```
+### Manual Python Environment Setup
 
-    *(Your terminal prompt should change to indicate the active environment, e.g., `(venv)`).*
+This project uses `poethepoet` for task automation, which simplifies the setup process. The recommended setup above is the easiest path. If you wish to run commands manually, you can inspect the tasks defined in `pyproject.toml` under `[tool.poe.tasks]`.
 
-6. **Install Dependencies:**
-    Install all the required Python packages listed in `pyproject.toml`:
+The manual steps are:
+
+1. **Create Virtual Environment:**
+
+    ```sh
+    uv venv
+    source .venv/bin/activate
+    ```
+
+2. **Install Dependencies:**
 
     ```sh
     uv sync
     ```
 
-7. **Configure Environment Variables (`.env` file):**
-    * Copy the example environment file:
-
-        ```sh
-        cp .env.example .env
-        ```
-
-    * **Edit the `.env` file** using a text editor and fill in the required values:
-        * **PostgreSQL Configuration (for Docker Compose & App):**
-            * `POSTGRES_USER`: Username for PostgreSQL (e.g., `moss_user`). Used by Docker Compose to create the user.
-            * `POSTGRES_PASSWORD`: Password for the PostgreSQL user. Used by Docker Compose.
-            * `POSTGRES_DB`: Database name (e.g., `moss_db`). Used by Docker Compose to create the database.
-            * `POSTGRES_HOST`: Hostname for PostgreSQL (e.g., `localhost` when connecting from your app to the Docker container via mapped port).
-            * `POSTGRES_PORT`: Port for PostgreSQL (e.g., `5432`). Used by Docker Compose to map the port.
-        * **Redis Configuration (for Docker Compose & App):**
-            * `REDIS_HOST`: Hostname for Redis (e.g., `localhost` when connecting from your app to the Docker container via mapped port).
-            * `REDIS_PORT`: Port for Redis (e.g., `6379`). Used by Docker Compose to map the port.
-        * **Application Connection URLs (used by the Python application):**
-            * `DATABASE_URL`: Full connection string for PostgreSQL, used by SQLAlchemy.
-                * Example: `postgresql://moss_user:your_secure_password@localhost:5432/moss_db`
-                * This URL should be consistent with the `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_HOST`, and `POSTGRES_PORT` variables.
-            * `CELERY_BROKER_URL`: Full URL for your Redis server, used by Celery for task queuing.
-                * Example: `redis://localhost:6379/0` (using Redis database 0).
-                * This URL should be consistent with `REDIS_HOST` and `REDIS_PORT`.
-            * `CELERY_RESULT_BACKEND_URL`: Full URL for your Redis server, used by Celery for storing task results.
-                * Example: `redis://localhost:6379/1` (using Redis database 1).
-                * This URL should be consistent with `REDIS_HOST` and `REDIS_PORT`.
-        * `GITHUB_API_TOKEN`: Your GitHub Personal Access Token (PAT).
-            * This is needed to interact with the GitHub API (fetching repository info, etc.).
-            * Generate one at: [https://github.com/settings/tokens](https://github.com/settings/tokens) (use "Tokens classic").
-            * Grant the `public_repo` scope for read-only access to public repositories. Keep this token secure!
-            * Example: `ghp_YourGitHubTokenHere`
-        * `OPENALEX_EMAIL`: Your email address.
-            * Used for the OpenAlex API "polite pool" for potentially better rate limits. See OpenAlex documentation.
-            * Example: `your.email@example.com`
-        * `VITE_API_BASE_URL`: URL for the backend API, used by the frontend.
-            * Default: `http://localhost:8000/api/v1`.
-
-8. **Set Up PostgreSQL and Redis Services:**
-
-    **Option 1: Using Docker (Recommended)**
-    This is the simplest way to get PostgreSQL and Redis running. Ensure Docker and Docker Compose are installed.
-    A `docker-compose.yml` file is provided in the project root. It uses the `POSTGRES_*` and `REDIS_*` variables from your `.env` file to configure the services.
-    Start the services in detached mode:
+3. **Run Database Migrations:**
 
     ```sh
-    docker-compose up -d
+    uv run python scripts/setup_db.py
     ```
 
-    This will automatically create the PostgreSQL database and user specified in your `.env` file.
-    To stop the services: `docker-compose down`
-
-    **Option 2: Manual Setup**
-    If you prefer to manage PostgreSQL and Redis manually:
-
-    **PostgreSQL:**
-    * Ensure your PostgreSQL server is running.
-    * Connect to your PostgreSQL server (e.g., using `psql` or a GUI tool).
-    * Create the database (use the name from `POSTGRES_DB` in `.env`):
-
-        ```sh
-        createdb your_db_name # Example: createdb moss_db
-        ```
-
-        Or using SQL: `CREATE DATABASE your_db_name;`
-    * Create a user and grant privileges (use credentials from `POSTGRES_USER` and `POSTGRES_PASSWORD` in `.env`):
-
-        ```sql
-        CREATE USER your_user WITH PASSWORD 'your_password';
-        GRANT ALL PRIVILEGES ON DATABASE your_db_name TO your_user;
-        -- Optional: ALTER DATABASE your_db_name OWNER TO your_user;
-        ```
-
-    * *(**Note:** Adjust commands based on your PostgreSQL setup and security practices.)*
-
-    **Redis:**
-    * Ensure your Redis server is running and accessible on the host and port specified in `REDIS_HOST` and `REDIS_PORT` in your `.env` file.
-
-9. **Run Database Migrations:**
-    This step creates all the necessary tables in your database based on the application's models. We use Alembic, managed via a script.
+4. **Install Frontend Dependencies:**
 
     ```sh
-    python scripts/setup_db.py
+    pnpm --dir frontend install
     ```
 
-    *(You should see output indicating migrations are being applied. If this fails, double-check your `.env` configuration and ensure PostgreSQL is running and accessible.)*
+5. **Start the Services (in 3 separate terminals):**
+    * **Terminal 1: API Server**
 
-10. **Install node and frontent dependencies:**
-    Install all the required node packages listed in `package.json`:
+      ```sh
+      uv run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+      ```
 
-    ```sh
-    cd frontend/
-    pnpm env use --global 24
-    pnpm install
-    ```
+    * **Terminal 2: Celery Worker**
 
-## Running the Application
+      ```sh
+      uv run celery -A backend.celery_app worker -l info
+      ```
 
-The application consists of two main parts that need to run concurrently: the **API Server** and the **Celery Workers**. You will typically run these in separate terminal windows (make sure the virtual environment is activated in each).
+    * **Terminal 3: Frontend Server**
 
-1. **Start the API Server (FastAPI with Uvicorn):**
-    This makes the REST API available.
+      ```sh
+      pnpm --dir frontend dev
+      ```
 
-    ```sh
-    ur run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
-    ```
+### Manual Service Setup (PostgreSQL & Redis)
 
-    * `backend.main:app`: Tells Uvicorn where to find the FastAPI app instance.
-    * `--reload`: Automatically restarts the server when code changes (useful for development). Remove this flag in production.
-    * `--host 0.0.0.0`: Makes the server accessible from other devices on your network (not just `localhost`).
-    * `--port 8000`: Specifies the port the server will listen on.
-    * You should see output indicating the server is running, often including `Application startup complete.`
-    * You can access the API documentation at `http://localhost:8000/docs` in your browser.
+If you are not using Docker, ensure PostgreSQL and Redis are installed and running, then:
 
-2. **Start the Celery Workers:**
-    These processes handle background tasks like keyword discovery and DOI processing. **Make sure Redis is running before starting the workers.**
+* **PostgreSQL:**
+    1. Create a database (e.g., `moss_db`).
+    2. Create a user and password (e.g., `moss_user`).
+    3. Grant the user privileges on the database.
+    4. Update the `POSTGRES_*` variables and the `DATABASE_URL` in your `.env` file to match.
+* **Redis:**
+    1. Ensure the Redis server is running.
+    2. Update `REDIS_HOST`, `REDIS_PORT`, `CELERY_BROKER_URL`, and `CELERY_RESULT_BACKEND_URL` in `.env` if your server is not on the default `localhost:6379`.
 
-    ```sh
-    uv run celery -A backend.celery_app worker -l info
-    ```
+### Environment Variable Details (`.env`)
 
-    * `-A backend.celery_app`: Points to the Celery application instance.
-    * `worker`: Specifies that this process should run as a worker.
-    * `-l info`: Sets the logging level to INFO (can be changed to DEBUG, WARNING, etc.).
+The `.env` file is crucial for configuring the application. Here is a detailed breakdown:
 
-3. **Start the Frontend Development Server:**
-    Run the development server script:
+* **`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_HOST`, `POSTGRES_PORT`**: These are used by Docker Compose to initialize the PostgreSQL container. They are also used to construct the `DATABASE_URL`.
+* **`REDIS_HOST`, `REDIS_PORT`**: Used by Docker Compose and to construct the Celery URLs.
+* **`DATABASE_URL`**: The full connection string for PostgreSQL, used by SQLAlchemy. Must be consistent with the `POSTGRES_*` variables.
+* **`CELERY_BROKER_URL`**: The URL for your Redis server (or other message broker) for task queuing.
+* **`CELERY_RESULT_BACKEND_URL`**: The URL for your Redis server to store task results.
+* **`GITHUB_API_TOKEN`**: **(Required)** Your GitHub Personal Access Token (PAT) for interacting with the GitHub API.
+* **`OPENALEX_EMAIL`**: **(Recommended)** Your email address for the OpenAlex API "polite pool" to get better rate limits.
+* **`VITE_API_BASE_URL`**: The base URL for the backend API, used by the frontend.
 
-    ```sh
-    pnpm dev
-    ```
-
-    *(This command typically starts a local web server for the frontend with features like automatic reloading when you change frontend code.)*
-
-4. **Access the Frontend:**
-    * Once the server starts, it will usually print a URL in the terminal. Open this URL in your web browser.
-    * Common URLs are `http://localhost:5173` (Vite default).
-
-**Summary of Running Terminals:**
-
-To run the full MOSS application locally for development, you will typically need **three separate terminals** running concurrently (ensure the Python virtual environment is activated in the backend terminals):
-
-1. **Terminal 1:** Backend API Server (`uvicorn backend.main:app ...`)
-2. **Terminal 2:** Celery Worker (`celery -A backend.celery_app worker ...`)
-3. **Terminal 3:** Frontend Development Server (`cd frontend && npm run dev`)
-
-*(Remember to have PostgreSQL and Redis running in the background as well).*
-
-## Running Database Migrations Manually
+## Manual Database Migrations
 
 If you make changes to the database models (`backend/data/models/`) later, you will need to:
 
@@ -287,7 +191,7 @@ If you make changes to the database models (`backend/data/models/`) later, you w
 2. **Apply the migration:**
 
     ```sh
-    python scripts/setup_db.py
+    uv run python scripts/setup_db.py
     ```
 
     *(Alternatively, you can use `alembic upgrade head`)*
@@ -310,14 +214,3 @@ A high-level overview of the project structure:
   * `frontend/`: Contains the React frontend code (setup instructions not covered here).
   * `logs/`: Where log files (`moss_api.log`, `moss_celery.log`) are stored.
   * `scripts/`: Helper scripts (database setup).
-
-## Configuration Summary (`.env`)
-
-The `.env` file is crucial for configuring the application. Key variables:
-
-* `DATABASE_URL`: Connection string for PostgreSQL.
-* `GITHUB_API_TOKEN`: Essential for interacting with GitHub.
-* `OPENALEX_EMAIL`: Recommended for better OpenAlex API access.
-* `CELERY_BROKER_URL`: Connection URL for Redis (or other broker).
-* `CELERY_RESULT_BACKEND_URL`: Connection URL for Redis (or other backend).
-* `VITE_API_BASE_URL`: URL for the backend API
