@@ -53,6 +53,10 @@ else:
     )
     celery_handler_class = RotatingFileHandler
     handler_info = "RotatingFileHandler (standard fallback)"
+import os
+
+log_dir = os.path.join(os.getcwd(), "logs")
+os.makedirs(log_dir, exist_ok=True)
 
 # Apply the custom logging configuration using the selected handler.
 # Logs for Celery workers will be directed to 'moss_celery.log'.
@@ -63,8 +67,9 @@ setup_logging(
 
 # Obtain the application's logger instance *after* the setup is complete.
 logger = logging.getLogger(__name__)
-logger.info(f"Celery logging configured using: {handler_info}.")
-
+log_path = os.path.join(log_dir, "moss_celery.log")
+logger.info(f"Celery logging configured using: {handler_info} → {log_path}")
+# --- End of Logging Configuration ---
 
 # --- Prevent Celery from overriding custom logging setup ---
 # Connect a handler to Celery's 'setup_logging' signal. By providing a handler
