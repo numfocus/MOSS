@@ -1,23 +1,23 @@
 /* frontend\src\pages\IngestPage.css */
 .ingest-page h2 {
     margin-bottom: 2rem;
-    color: #333;
-    border-bottom: 1px solid #eee;
+    color: var(--header-color);
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: 0.5rem;
   }
   
   .ingest-section {
     margin-bottom: 2.5rem;
     padding: 1.5rem;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border-color);
     border-radius: 8px;
-    background-color: #fdfdfd;
+    background-color: var(--content-bg-color);
   }
   
   .ingest-section h3 {
     margin-top: 0;
     margin-bottom: 1.5rem;
-    color: #444;
+    color: var(--header-color);
   }
   
   .ingest-form {
@@ -29,28 +29,31 @@
   .ingest-form label {
     font-weight: bold;
     margin-bottom: -0.5rem; /* Pull label closer to input */
-    color: #555;
+    color: var(--input-color);
   }
   
   .ingest-form input[type="url"],
   .ingest-form input[type="text"] {
     padding: 0.75rem;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     font-size: 1rem;
+    background-color: var(--input-bg);
+    color: var(--input-color);
   }
   
   .ingest-form input:disabled {
-      background-color: #eee;
+      background-color: var(--status-unknown-bg); /* Use a neutral background for disabled */
       cursor: not-allowed;
+      color: var(--button-disabled-text-color);
   }
   
   
   .ingest-form button {
     padding: 0.75rem 1.5rem;
-    background-color: #007bff;
-    color: white;
-    border: none;
+    background-color: var(--button-bg-color);
+    color: var(--button-text-color);
+    border: non;
     border-radius: 4px;
     font-size: 1rem;
     cursor: pointer;
@@ -59,20 +62,21 @@
   }
   
   .ingest-form button:hover:not(:disabled) {
-    background-color: #0056b3;
+    background-color: var(--button-hover-bg-color);
   }
   
   .ingest-form button:disabled {
-    background-color: #cccccc;
+    background-color: var(--button-disabled-bg-color);
     cursor: not-allowed;
+    color: var(--button-disabled-text-color);
   }
   
   .success-message {
     margin-top: 1rem;
     padding: 0.75rem;
-    background-color: #d4edda; /* Light green */
-    color: #155724; /* Dark green */
-    border: 1px solid #c3e6cb;
+    background-color: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid var(--success-border);
     border-radius: 4px;
     font-size: 0.95em;
     white-space: pre-wrap; /* Wrap long messages */
