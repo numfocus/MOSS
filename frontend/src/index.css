@@ -9,11 +9,13 @@
 
   /* --- FIXED BASE STYLES (Align with Light Theme Variables) --- */
   /* Set default text color suitable for the light background */
-  color: #212529; /* Or use var(--input-color) */
+  /* CHANGED: use variable instead of hardcoded color to avoid
+     browser dark-mode overrides and ensure consistent contrast */
+  color: var(--input-color); /* was #212529 */
+
   /* Set default background using the light theme variable */
   background-color: var(--body-bg-color);
   /* --- END FIXED BASE STYLES --- */
-
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -23,7 +25,7 @@
   /* CSS variables for easier theming (Defaulting to LIGHT mode) */
   --body-bg-color: #f8f9fa;
   --content-bg-color: #ffffff;
-  --header-color: #333;
+  --header-color: #212529; /* CHANGED: slightly darker for WCAG AAA contrast */
   --header-color-secondary: #555;
   --input-bg: #fff;
   --input-color: #212529; /* Base text color for light mode */
@@ -40,7 +42,10 @@
   --button-disabled-border-color: #cccccc;
   --border-color: #dee2e6;
   --header-bg-color: #343a40;
-  --header-link-color: #adb5bd;
+
+  /* CHANGED: slightly brighter to improve contrast on dark header */
+  --header-link-color: #ced4da; /* was #adb5bd */
+
   --header-link-hover-color: #f8f9fa;
   --header-link-active-color: #ffffff;
   --header-link-active-border-color: #5c6bc0;
@@ -65,9 +70,9 @@
 }
 
 #root {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 body {
@@ -76,6 +81,12 @@ body {
   min-height: 100vh;
   /* Background is now handled by :root or dark mode */
   /* color is inherited from :root */
+}
+
+/* CHANGED: ensure placeholder text meets WCAG contrast */
+::placeholder {
+  color: #6c757d; /* WCAG AA on light background */
+  opacity: 1; /* prevent browser reducing contrast */
 }
 
 a {
@@ -112,23 +123,38 @@ button:focus-visible {
   outline-color: var(--button-focus-outline-color);
 }
 button:disabled {
-    background-color: var(--button-disabled-bg-color);
-    color: var(--button-disabled-text-color);
-    cursor: not-allowed;
-    border-color: var(--button-disabled-border-color);
+  background-color: var(--button-disabled-bg-color);
+  color: var(--button-disabled-text-color);
+  cursor: not-allowed;
+  border-color: var(--button-disabled-border-color);
+  opacity: 0.65; /* ADDED: improves visibility without harming contrast */
 }
+
 
 /* --- Styles for Layout --- */
 .app-layout {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background-color: var(--body-bg-color); /* Use variable */
+  background-color: var(--body-bg-color);
+}
+
+/* Improve visibility of section headings on dark background */
+/* This targets headings that are NOT inside white content cards */
+.app-layout > h2,
+.app-layout > h3 {
+  color: var(--header-color); /* Ensures sufficient contrast on body background */
+}
+
+/* Ensure section headers above cards are not dimmed by parent opacity */
+.app-layout > h2,
+.app-layout > h3 {
+  opacity: 1; /* Prevent inherited opacity from parent containers */
 }
 
 .app-header {
   background-color: var(--header-bg-color);
-  color: white; /* Header text is white */
+  color: white;
   padding: 0.75rem 1.5rem;
   display: flex;
   justify-content: space-between;
@@ -175,8 +201,7 @@ button:disabled {
   margin: 1rem auto 2rem auto;
   width: 100%;
   box-sizing: border-box;
-  background-color: var(--content-bg-color); /* Uses light/white bg variable */
-  /* Text color will be inherited from :root (now dark) */
+  background-color: var(--content-bg-color);
   border-radius: 4px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
@@ -195,54 +220,55 @@ button:disabled {
 /* --- Page Specific Base Styles --- */
 
 h2, h3, h4 {
-    color: var(--header-color); /* Uses dark color variable */
-    margin-top: 0;
-    margin-bottom: 1rem;
+  color: var(--header-color);
+  margin-top: 0;
+  margin-bottom: 1rem;
 }
 
 h2 { font-size: 1.8em; }
 h3 { font-size: 1.4em; }
-h4 { font-size: 1.15em; color: var(--header-color-secondary); } /* Uses slightly lighter dark color variable */
-
+h4 {
+  font-size: 1.15em;
+  color: var(--header-color-secondary);
+}
 
 hr {
-    border: none;
-    border-top: 1px solid var(--border-color);
-    margin: 1.5rem 0;
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 1.5rem 0;
 }
 
 /* Detail page section styling */
 .detail-section {
-    margin-top: 1.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--border-color);
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
 }
 .detail-section h4 {
-    margin-bottom: 0.8rem;
+  margin-bottom: 0.8rem;
 }
 .detail-section ul {
-    list-style: disc;
-    margin-left: 1.5rem;
-    padding-left: 0.5rem;
-    line-height: 1.7;
+  list-style: disc;
+  margin-left: 1.5rem;
+  padding-left: 0.5rem;
+  line-height: 1.7;
 }
 .detail-section li {
-    margin-bottom: 0.4rem;
+  margin-bottom: 0.4rem;
 }
 .detail-section p {
-    margin-bottom: 0.5rem;
-    /* Text color inherited from .app-content / :root */
+  margin-bottom: 0.5rem;
 }
 
 /* Form styling */
 .ingest-section {
-    margin-bottom: 2rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid var(--border-color);
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
 }
 .ingest-section:last-of-type {
-    border-bottom: none;
-    padding-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 .form-group {
@@ -252,49 +278,48 @@ hr {
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 500;
-  /* Text color inherited */
 }
 .form-group input[type="url"],
 .form-group input[type="text"] {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid #ced4da; /* Explicit border */
+  border: 1px solid #ced4da;
   border-radius: 4px;
   box-sizing: border-box;
-  background-color: var(--input-bg); /* Uses variable (light/dark) */
-  color: var(--input-color); /* Uses variable (dark/light) */
+  background-color: var(--input-bg);
+  color: var(--input-color);
 }
 .form-group input[type="url"]:disabled,
 .form-group input[type="text"]:disabled {
-    background-color: #e9ecef; /* Specific disabled background */
-    cursor: not-allowed;
+  background-color: #e9ecef;
+  cursor: not-allowed;
+  color: #6c757d; /* CHANGED: ensure disabled text remains readable */
 }
-
 
 .success-message {
-    margin-top: 1rem;
-    padding: 0.8rem 1rem;
-    background-color: var(--success-bg);
-    color: var(--success-text);
-    border: 1px solid var(--success-border);
-    border-radius: 4px;
+  margin-top: 1rem;
+  padding: 0.8rem 1rem;
+  background-color: var(--success-bg);
+  color: var(--success-text);
+  border: 1px solid var(--success-border);
+  border-radius: 4px;
 }
 .success-message p {
-    margin: 0.2rem 0;
+  margin: 0.2rem 0;
 }
 
 /* Keyword Status Styling */
 .keyword-status {
-    margin-top: 1rem;
-    padding: 0.8rem 1rem;
-    border: 1px solid var(--status-border);
-    border-radius: 4px;
-    background-color: var(--status-bg);
-    border-left-width: 5px;
-    border-left-style: solid;
-    /* Text color inherited */
+  margin-top: 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--status-border);
+  border-radius: 4px;
+  background-color: var(--status-bg);
+  border-left-width: 5px;
+  border-left-style: solid;
 }
 .keyword-status p { margin: 0.3rem 0; }
+
 .status-queued { border-left-color: var(--status-queued-border); background-color: var(--status-queued-bg);}
 .status-running { border-left-color: var(--status-running-border); background-color: var(--status-running-bg);}
 .status-completed { border-left-color: var(--status-completed-border); background-color: var(--status-completed-bg);}
@@ -304,30 +329,28 @@ hr {
 /* Topic badge from Repository Detail */
 .topics-list { margin-top: 0.5rem; margin-bottom: 0.5rem; }
 .topic-badge {
-    display: inline-block;
-    background-color: #e0e0e0;
-    color: #333;
-    padding: 0.2rem 0.5rem;
-    margin-right: 0.4rem;
-    margin-bottom: 0.4rem;
-    border-radius: 1rem;
-    font-size: 0.85em;
-    white-space: nowrap;
+  display: inline-block;
+  background-color: #dee2e6; /* CHANGED: improved contrast for small text */
+  color: #212529; /* CHANGED: WCAG AA compliant */
+  padding: 0.2rem 0.5rem;
+  margin-right: 0.4rem;
+  margin-bottom: 0.4rem;
+  border-radius: 1rem;
+  font-size: 0.85em;
+  white-space: nowrap;
 }
 
 /* --- END Styles for Layout --- */
 
-
 /* Dark mode specific styles */
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Overrides for dark mode */
     --body-bg-color: #212529;
     --content-bg-color: #2c3034;
     --header-color: #e9ecef;
     --header-color-secondary: #adb5bd;
     --input-bg: #343a40;
-    --input-color: #f8f9fa; /* Base text color for dark mode */
+    --input-color: #f8f9fa;
     --link-color: #9fa8da;
     --link-hover-color: #7986cb;
     --button-bg-color: #7986cb;
@@ -341,7 +364,7 @@ hr {
     --button-disabled-border-color: #495057;
     --border-color: #495057;
     --header-bg-color: #1c1f23;
-    --header-link-color: #adb5bd;
+    --header-link-color: #ced4da; /* CHANGED: improved contrast */
     --header-link-hover-color: #ffffff;
     --header-link-active-color: #ffffff;
     --header-link-active-border-color: #9fa8da;
@@ -364,45 +387,33 @@ hr {
     --status-unknown-border: #6c757d;
     --status-unknown-bg: #495057;
 
-    /* Explicitly override base text color for dark mode */
-    color: var(--input-color); /* Uses the light text color variable */
+    color: var(--input-color);
   }
 
-  /* Explicit overrides for dark mode if needed, beyond variables */
-  body { background-color: var(--body-bg-color); color: var(--input-color); } /* Ensure body text color is set */
-  a { color: var(--link-color); }
-  a:hover { color: var(--link-hover-color); }
+  /* Improve horizontal rule visibility in dark mode */
+  hr {
+    border-top-color: #6c757d; /* Stronger contrast than default border */
+  }
 
-  .topic-badge { background-color: #495057; color: #e9ecef; }
+  /* Improve disabled button clarity in dark mode */
+  button:disabled {
+    background-color: #6c757d; /* Clearer than default dark disabled bg */
+    color: #e9ecef;
+  }
+
+  /* Dark-mode placeholder contrast */
+  ::placeholder {
+    color: #adb5bd; /* CHANGED: WCAG AA in dark mode */
+  }
+
+  .topic-badge {
+    background-color: #495057;
+    color: #e9ecef;
+  }
 
   .form-group input[type="url"]:disabled,
   .form-group input[type="text"]:disabled {
-      background-color: #3a3f44;
+    background-color: #3a3f44;
+    color: #adb5bd; /* CHANGED: readable disabled text */
   }
-
-  /* Explicitly set text color for elements that might inherit incorrectly */
-  .detail-section p, .detail-section li {
-      color: var(--input-color); /* Ensure these inherit the correct dark mode text color */
-  }
-  .keyword-status {
-       color: var(--input-color); /* Ensure text in status box is readable */
-  }
-   .keyword-status p small { /* Make small text slightly less bright */
-       color: #adb5bd;
-   }
-
-   .form-group label {
-      color: #ced4da; /* Lighter label color for dark mode */
-   }
-   .ingest-section h3 {
-     color: #dee2e6;
-   }
-   .search-results .results-category h4 {
-      color: #e9ecef;
-   }
-    .search-results .results-category li {
-       color: var(--input-color); /* Make sure list items are readable */
-   }
-
-
 }
